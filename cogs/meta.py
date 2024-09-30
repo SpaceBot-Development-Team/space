@@ -1,23 +1,48 @@
+"""
+The MIT License (MIT)
+
+Copyright (c) 2024-present Developer Anonymous
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+"""
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, TypeAlias, Union, TYPE_CHECKING, ClassVar
-
-from discord.ext import commands, menus
-import discord.ext.commands.view
-from .utils.paginator import SpacePages
-import discord
+import datetime
 import inspect
 import itertools
-import bs4
+from typing import Any, Mapping, Optional, TypeAlias, Union, TYPE_CHECKING, ClassVar
 
+import bs4
+import pygit2
+import discord
+import discord.ext.commands.view
+from discord.ext import commands, menus
+
+from _types.context import Context
+from _types import command
+from .utils.paginator import SpacePages
 
 if TYPE_CHECKING:
     from _types.bot import Bot
 
     RoboDanny: TypeAlias = Bot
     from _types.context import GuildContext
-
-from _types.context import Context
 
 RoboPages: TypeAlias = SpacePages
 
@@ -415,8 +440,69 @@ class Meta(commands.Cog):
             CodeModal(self.bot, itx.user.id, itx.guild_id or 0)
         )
 
+    @staticmethod
+    def format_relative(dt: datetime.datetime) -> str:
+        return discord.utils.format_dt(dt, 'R')
+
+    def format_commit(self, commit: pygit2.Commit) -> str:
+        short, _, _ = commit.message.partition('\n')
+        short_sha2 = commit.short_id
+        commit_tz = datetime.timezone(datetime.timedelta(minutes=commit.commit_time_offset))
+        commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
+        offset = self.format_relative(commit_time.astimezone(datetime.timezone.utc))
+        return f'[`{short_sha2}`](https://github.com/SpaceBot-Development-Team/space/commit/{commit.id}) {short} ({offset})'
+
+    async def get_latest_commits(self, count: int = 3) -> str:
+        repo = pygit2.Repository('.git')
+        commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))  # type: ignore
+        return '\n'.join(self.format_commit(commit) for commit in commits)
+
+    @command(name="stats")
+    @commands.cooldown(1, 15, commands.BucketType.member)
+    @discord.app_commands.allowed_installs(guilds=True, users=True)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+    async def command_bot_stats(self, ctx: Context) -> Any:
+        """Comprueba las estadísticas del bot."""
+        await ctx.defer()
+        try:
+            revision = await self.get_latest_commits()
+        except Exception:
+            revision = '*Ninguno... de momento*'
+        embed = discord.Embed(description='Cambios más recientes:\n' + revision)
+        embed.title = 'Invitación al Servidor de Soporte Oficial'
+        embed.url = 'https://discord.gg/m9UsWuaYDT'
+        embed.colour = self.bot.default_color
+
+        total_members = 0
+        total_unique = len(self.bot.users)
+
+        text = 0
+        voice = 0
+        guilds = 0
+        for guild in self.bot.guilds:
+            guilds += 1
+            if guild.unavailable:
+                continue
+
+            total_members += guild.member_count or guild.approximate_member_count or 0
+            for channel in guild.channels:
+                if isinstance(channel, discord.TextChannel):
+                    text += 1
+                elif isinstance(channel, discord.VoiceChannel):
+                    voice += 1
+
+        embed.add_field(name='Miembros', value=f'{total_members} en total\n{total_unique} únicos')
+        embed.add_field(name='Canales', value=f'{text+voice} en total\n{text} canales de texto\n{voice} canales de voz')
+
+        version = discord.__version__
+        embed.add_field(name='Servidores', value=guilds)
+        embed.set_footer(text=f'Hecho en discord.py v{version} con 💖 por @dev_anony', icon_url='https://imgur.com/5BFecvA')
+        embed.timestamp = discord.utils.utcnow()
+        await ctx.reply(embed=embed)
+
 
 class CodeModal(discord.ui.Modal):
+    """Modal for app_commands evaluate command"""
     def __init__(self, bot: Bot, user_id: int, guild_id: int) -> None:
         self.bot: Bot = bot
         super().__init__(

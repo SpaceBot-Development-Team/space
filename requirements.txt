@@ -8,3 +8,4 @@ beautifulsoup4
 pynacl
 tortoise-orm
 python-dotenv
+pygit2
