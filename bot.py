@@ -44,6 +44,19 @@ except KeyError as exc:
         "Could not initialize bot because the environment was not set"
     ) from exc
 
+if '.git' not in os.listdir('.'):
+    INITIALIZE_GIT_HISTORY = [
+        'git init',
+        'git remote add bot_source https://github.com/SpaceBot-Development-Team/space.git',
+        'git branch -M master',
+        'git config user.name SpaceBotLauncher',
+        'git add .',
+        'git commit -m "Never commited changes"',
+        'git pull bot_source master',
+    ]
+    for command in INITIALIZE_GIT_HISTORY:
+        os.system(command)
+
 extensions: list[str] = [
     "cogs.admin",
     "cogs.owner",
