@@ -492,11 +492,17 @@ class Meta(commands.Cog):
                     voice += 1
 
         embed.add_field(name='Miembros', value=f'{total_members} en total\n{total_unique} únicos')
-        embed.add_field(name='Canales', value=f'{text+voice} en total\n{text} canales de texto\n{voice} canales de voz')
+        embed.add_field(
+            name='Canales',
+            value=f'{text+voice} en total\n{text} canales de texto\n{voice} canales de voz',
+        )
 
         version = discord.__version__
         embed.add_field(name='Servidores', value=guilds)
-        embed.set_footer(text=f'Hecho en discord.py v{version} con 💖 por @dev_anony', icon_url='https://imgur.com/5BFecvA')
+        embed.set_footer(
+            text=f'Hecho en discord.py v{version} con 💖 por @dev_anony',
+            icon_url='http://i.imgur.com/5BFecvA.png',
+        )
         embed.timestamp = discord.utils.utcnow()
         await ctx.reply(embed=embed)
 

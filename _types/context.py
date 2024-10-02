@@ -150,48 +150,13 @@ class Context(_CTX):
         # we need this for our cache key strat
         return "<Context>"
 
-    async def translate(
-        self,
-        string: str,
-        *,
-        locale: discord.Locale = discord.utils.MISSING,
-        data: Any = discord.utils.MISSING,
-    ) -> str:
-        """Translates a string and returns its resolved str"""
-
-        if locale is discord.utils.MISSING:
-            locale = discord.Locale.spain_spanish
-
-        if self.interaction:
-            ret = await self.interaction.translate(string, locale=locale, data=data)
-        else:
-            context = discord.app_commands.TranslationContext(
-                discord.app_commands.TranslationContextLocation.other, data=data
-            )
-            translator = self.bot.tree.translator
-            if not translator:
-                ret = string
-            else:
-                ret = await translator.translate(
-                    discord.app_commands.locale_str(string),
-                    locale=locale,
-                    context=context,
-                )
-        ret = ret or string
-
-        if ret == "...":
-            ret = string
-        return ret
-
     async def send(
         self, content: Optional[str] = discord.utils.MISSING, **kwargs: Any
     ) -> discord.Message:
-        if content is not None:
-            if self.interaction is not None:
-                locale = self.interaction.locale
-            else:
-                locale = discord.utils.MISSING
-            content = await self.translate(content, locale=locale)
+        if content is not None and self.interaction:
+            translated_content = await self.interaction.translate(content)
+            if translated_content is not None:
+                content = translated_content
         return await super().send(content, **kwargs)
 
     @property

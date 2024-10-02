@@ -25,11 +25,12 @@ from discord.app_commands.models import (
 from discord import Emoji, PartialEmoji, app_commands as apps
 from discord.ext.commands.errors import ExtensionAlreadyLoaded
 from discord.ext import commands
-from tortoise import Tortoise, connections
+from tortoise import Tortoise
 
 from .context import Context
 from .errors import SuggestionFailure, VouchFailure
 from .events import Dispatchable
+from .translator import Translator
 
 from logging import Logger, INFO, getLogger
 
@@ -417,6 +418,9 @@ class Bot(BotBase):
         await self._load_guild_prefixes()
         self._populate_cogs_display_emojis()
         self._add_dispatchables()
+        translator = Translator()
+        translator.session = self.session
+        await self.tree.set_translator(translator)
 
     async def _load_guild_prefixes(self) -> None:
         from models import Guild  # type: ignore

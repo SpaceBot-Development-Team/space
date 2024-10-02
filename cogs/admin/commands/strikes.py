@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, cast
 
 import discord
 from discord import app_commands
+from discord.app_commands import locale_str
 from discord.ext import commands
 
 from _types import group
@@ -46,12 +47,12 @@ async def strike_autocomplete(
 ) -> List[app_commands.Choice]:
     """Strike autocomplete that returns all the available strikes"""
 
-    user = interaction.namespace["user"]
+    user = interaction.namespace["staff"]
 
     if user is None:  # If user not set yet
         return [
             app_commands.Choice(
-                name="Escoge al staff que sancionar antes de que strike quitar",
+                name=locale_str("Escoge al staff que sancionar antes de que strike quitar"),
                 value="none",
             )
         ]
@@ -61,7 +62,7 @@ async def strike_autocomplete(
     )
 
     if not config or not config.strikes:
-        return [app_commands.Choice(name="Este staff no tiene strikes", value="none")]
+        return [app_commands.Choice(name=locale_str("Este staff no tiene strikes"), value="none")]
 
     choices: List[app_commands.Choice] = []
 
@@ -188,7 +189,7 @@ class StrikesCommands:
         name="strike",
         fallback="staff",
         usage="<staff> <strikes> <reason> [--note=None]",
-    )
+    )  # type: ignore
     @can_run_strike()
     @commands.has_permissions(moderate_members=True)
     @app_commands.default_permissions(moderate_members=True)
