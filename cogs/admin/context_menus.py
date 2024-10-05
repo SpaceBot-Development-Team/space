@@ -27,7 +27,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from _types.contextutil import ContextMenuHolder, context_menu
+from discord_tools.app_commands import CogContextMenuHolder
 from _types.bot import Bot
 from _types.warns.models import WarnConfig
 from models import WarnsConfig, GuildUser
@@ -45,18 +45,13 @@ class AdminContextMenus(commands.Cog):
 
     def __init__(self, bot: Bot) -> None:
         self.bot: Bot = bot
-        self._context_menu_holder = ContextMenuHolder.partial_holder()
-        self._context_menu_holder.on_attach = self.on_attach
-
-    async def on_attach(self) -> None:
-        """Called when the context menu holder gets attached"""
-        self._context_menu_holder.load_commands_from(self)
+        self.context_menu_holder: CogContextMenuHolder = CogContextMenuHolder(self)
 
     async def cog_load(self) -> None:
-        self._context_menu_holder.attach(self.bot)
-        self._context_menu_holder.copy_to_tree()
+        self.context_menu_holder.load_menus()
+        self.context_menu_holder.add_to_tree()
 
-    @context_menu(
+    @CogContextMenuHolder.context_menu(
         name="Advertir Usuario",
     )
     @app_commands.default_permissions(

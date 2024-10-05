@@ -54,6 +54,7 @@ from sessions import (
 )
 from models import Guild, WarnsConfig
 from .commands.strikes import StrikesCommands
+from .commands.warns import WarnsCommands
 
 
 T = TypeVar("T")
@@ -98,7 +99,7 @@ class StrikeAddFlags(commands.FlagConverter, prefix="--", delimiter=" "):
     )
 
 
-class Admin(StrikesCommands, Cog):
+class Admin(StrikesCommands, WarnsCommands, Cog):
     """Comandos para administradores."""
 
     CONTRAST_COLOR: ClassVar[discord.Color] = discord.Color.from_str("#755ae0")
