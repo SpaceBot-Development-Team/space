@@ -131,12 +131,12 @@ class WarnsConfigSession:
     @classmethod
     async def from_context(cls, ctx: Context) -> WarnsConfigSession:
         cfg: WarnsConfig | None = await WarnsConfig.get_or_none(
-            guild=ctx.guild.id,
+            id=ctx.guild.id,
         )
 
         if not cfg:
             cfg = await WarnsConfig.create(
-                guild=ctx.guild.id,
+                id=ctx.guild.id,
                 enabled=False,
                 config=WarnConfigModel.from_params(
                     roles=[],
