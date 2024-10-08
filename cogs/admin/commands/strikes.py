@@ -261,7 +261,7 @@ class StrikesCommands:
 
         embed = discord.Embed(
             description=f"**{ctx.author.mention} ha sancionado a {staff.mention}**\n"
-            "**Strikes:** {strikes}\n**Razón:** {flags.reason}",
+            f"**Strikes:** {strikes}\n**Razón:** {flags.reason}",
             colour=discord.Colour.blurple(),
         )
         embed.set_author(
