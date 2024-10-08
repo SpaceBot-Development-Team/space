@@ -124,9 +124,6 @@ class _CTX(commands.Context[Any]):
 
 
 class Context(_CTX):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     async def entry_to_code(self, entries: Iterable[Tuple[str, str]]) -> None:
         width = max(len(a) for a, b in entries)
         output = ["```"]
@@ -154,9 +151,11 @@ class Context(_CTX):
         self, content: Optional[str] = discord.utils.MISSING, **kwargs: Any
     ) -> discord.Message:
         if content is not None and self.interaction:
-            translated_content = await self.interaction.translate(content)
-            if translated_content is not None:
-                content = translated_content
+            command: discord.app_commands.Command = self.interaction.command  # type: ignore
+            if command.extras.get('translate_response', False):
+                translated_content = await self.interaction.translate(content)
+                if translated_content is not None:
+                    content = translated_content
         return await super().send(content, **kwargs)
 
     @property

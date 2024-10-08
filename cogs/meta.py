@@ -26,6 +26,7 @@ from __future__ import annotations
 import datetime
 import inspect
 import itertools
+import logging
 from typing import Any, Mapping, Optional, TypeAlias, Union, TYPE_CHECKING, ClassVar
 
 import bs4
@@ -33,6 +34,7 @@ import pygit2
 import discord
 import discord.ext.commands.view
 from discord.ext import commands, menus
+from discord.ext.commands.view import StringView
 
 from _types.context import Context
 from _types import command
@@ -45,6 +47,7 @@ if TYPE_CHECKING:
     from _types.context import GuildContext
 
 RoboPages: TypeAlias = SpacePages
+logger = logging.getLogger(__name__)
 
 
 class Prefix(commands.Converter):
@@ -212,6 +215,12 @@ class FrontPageSource(menus.PageSource):
         elif self.index == 1:
             entries = (
                 (
+                    "Los emojis de los comandos",
+                    "Si el comando contiene el emoji <:prefixed_command:1293248180606996600>, entonces se puede utilizar como "
+                    f"comando prefijado (`{menu.ctx.prefix}comando`), si el comando contiene el emoji <:application_command:1293248219266027591> "
+                    "entonces se puede utilizar como comando de aplicación (`/comando`)."
+                ),
+                (
                     "<argumento>",
                     "Esto significa que el argumento es __**obligatorio**__.",
                 ),
@@ -331,6 +340,13 @@ class PaginatedHelpCommand(commands.HelpCommand):
         )
         await menu.start()
 
+    def get_usage_emojis(self, command: commands.HybridCommand | commands.HybridGroup) -> str:
+        application_emoji = "<:application_command:1293248219266027591>"
+        string = "<:prefixed_command:1293248180606996600>"
+        if command.with_app_command and command.app_command:
+            string += application_emoji
+        return string
+
     def common_command_formatting(
         self,
         embed_like: discord.Embed,
@@ -338,7 +354,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
     ):
         embed_like.title = self.get_command_signature(command)
         if command.description:
-            embed_like.description = f"{command.description}\n\n{command.help}"
+            embed_like.description = f"{self.get_usage_emojis(command)} {command.description}\n\n{command.help}"
         else:
             embed_like.description = command.help or "Sin ayuda corta"
 
@@ -374,7 +390,8 @@ class Meta(commands.Cog):
     """Comandos misceláneos"""
 
     def __init__(self, bot: Bot) -> None:
-        bot.help_command = PaginatedHelpCommand()
+        self.paginated_help_command = PaginatedHelpCommand()
+        bot.help_command = self.paginated_help_command
         bot.help_command.cog = self
 
         self.bot = bot
@@ -389,6 +406,62 @@ class Meta(commands.Cog):
         return await self.bot.loop.run_in_executor(
             None, self.blocking_get_from_html, html
         )
+
+    async def get_context(self, interaction: discord.Interaction) -> Context:
+        bot = self.bot
+        command = interaction.command
+        if command is None:
+            raise ValueError('interaction does not have command data')
+        data = interaction.data
+        if interaction.message is None:
+            synthetic = {
+                'id': interaction.id,
+                'reactions': [],
+                'embeds': [],
+                'mention_everyone': False,
+                'tts': False,
+                'pinned': False,
+                'edited_timestamp': None,
+                'type': discord.MessageType.chat_input_command if data.get('type', 1) == 1 else discord.MessageType.context_menu_command,
+                'flags': 64,
+                'content': '',
+                'mentions': [],
+                'mention_roles': [],
+                'attachments': [],
+            }
+            if interaction.channel_id is None:
+                raise RuntimeError('interaction channel ID is null, this is probably a Discord bug')
+            channel = interaction.channel or discord.PartialMessageable(
+                state=interaction._state, guild_id=interaction.guild_id, id=interaction.channel_id
+            )
+            message = discord.Message(state=interaction._state, channel=channel, data=synthetic)
+            message.author = interaction.user
+            message.attachments = [a for _, a in interaction.namespace if isinstance(a, discord.Attachment)]
+        else:
+            message = interaction.message
+        prefix = '/' if data.get('type', 1) == 1 else '\u200b'
+        ctx = Context(
+            message=message,
+            bot=bot,
+            view=StringView(''),
+            args=[],
+            kwargs={},
+            prefix=prefix,
+            interaction=interaction,
+            invoked_with=command.name,
+            command=command,
+        )
+        interaction._baton = ctx
+        ctx.command_failed = interaction.command_failed
+        return ctx
+
+    @discord.app_commands.command(name="help")
+    @discord.app_commands.checks.cooldown(1, 30, key=lambda i: (i.guild_id, i.user.id))
+    async def slash_help(self, interaction: discord.Interaction, *, command: str | None = None) -> Any:
+        """Muestra ayuda de un comando, grupo o categoría."""
+        context = await self.bot.get_context(interaction)
+        self.paginated_help_command.context = context
+        await self.paginated_help_command.command_callback(context, command=command)
 
     @commands.command(name="evaluate", aliases=["eval"])
     @commands.cooldown(1, 60, commands.BucketType.member)

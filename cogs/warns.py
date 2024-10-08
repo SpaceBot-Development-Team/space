@@ -33,9 +33,9 @@ import warnings
 import discord
 from discord.state import ConnectionState
 from discord.ext import commands
+from discord_tools.app_commands import CogContextMenuHolder
 
 from _types.bot import Bot
-from _types.contextutil import ContextMenuHolder
 from _types.warns import Warn, ActionType
 from models import GuildUser, WarnsConfig
 
@@ -181,20 +181,14 @@ class Warns(commands.Cog):
 
     def __init__(self, bot: Bot) -> None:
         self.bot: Bot = bot
-        self._context_menu_holder: ContextMenuHolder = (
-            ContextMenuHolder.partial_holder()
-        )
-        self._context_menu_holder.on_attach = self.on_attach
-
-    def on_attach(self) -> None:
-        self._context_menu_holder.load_commands_from(self)
-        self._context_menu_holder.copy_to_tree()
+        self._context_menu_holder: CogContextMenuHolder = CogContextMenuHolder(self)
 
     async def cog_load(self) -> None:
-        self._context_menu_holder.attach(self.bot)
+        self._context_menu_holder.load_menus()
+        self._context_menu_holder.add_to_tree(tree=self.bot.tree)
 
     async def cog_unload(self) -> None:
-        for command in self._context_menu_holder.commands:
+        for command in self._context_menu_holder.context_menus:
             self.bot.tree.remove_command(command.name, type=command.type)
             self._context_menu_holder.remove_command(command)
 

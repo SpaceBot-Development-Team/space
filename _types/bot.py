@@ -13,6 +13,7 @@ from asyncio import iscoroutinefunction
 
 import aiohttp
 import datetime
+import traceback
 
 import discord
 from discord.ext.commands import Bot as BotBase
@@ -502,6 +503,14 @@ class Bot(BotBase):
             return info.team.members
         return None
 
+    async def get_context(
+        self,
+        origin: discord.Message | discord.Interaction,
+        /, *,
+        cls: type[commands.Context] = Context
+    ) -> Context["Bot"]:
+        return await super().get_context(origin, cls=cls)
+
     async def on_message(self, message: discord.Message, /) -> None:
         if message.author.bot or message.author == self.user:
             return
@@ -650,7 +659,7 @@ class Bot(BotBase):
             )
         else:
             await ctx.reply(
-                f"❓ | Un error desconocido ha ocurrido.\nRéportalo en el servidor de soporte: ```py\n{error}```.",
+                f"❓ | Un error desconocido ha ocurrido.\nRéportalo en el servidor de soporte: ```py\n{traceback.format_exc()}```.",
                 ephemeral=True,
             )
 
