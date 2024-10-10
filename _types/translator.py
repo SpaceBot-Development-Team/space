@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -55,10 +56,10 @@ class Translator(i18n.Translator):
 
     async def load(self) -> None:
         async with self.session.get(
-            'https://raw.githubusercontent.com/SpaceBot-Development-Team/translations/refs/heads/master/translations.json',
+            "https://raw.githubusercontent.com/SpaceBot-Development-Team/translations/refs/heads/master/translations.json",
         ) as resp:
             buffer = await resp.text()
-            self.load_translations(buffer, strategy='json')
+            self.load_translations(buffer, strategy="json")
 
     async def translate(
         self,

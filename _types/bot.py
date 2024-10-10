@@ -506,8 +506,9 @@ class Bot(BotBase):
     async def get_context(
         self,
         origin: discord.Message | discord.Interaction,
-        /, *,
-        cls: type[commands.Context] = Context
+        /,
+        *,
+        cls: type[commands.Context] = Context,
     ) -> Context["Bot"]:
         return await super().get_context(origin, cls=cls)
 

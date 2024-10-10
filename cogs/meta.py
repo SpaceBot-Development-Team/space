@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -218,7 +219,7 @@ class FrontPageSource(menus.PageSource):
                     "Los emojis de los comandos",
                     "Si el comando contiene el emoji <:prefixed_command:1293248180606996600>, entonces se puede utilizar como "
                     f"comando prefijado (`{menu.ctx.prefix}comando`), si el comando contiene el emoji <:application_command:1293248219266027591> "
-                    "entonces se puede utilizar como comando de aplicación (`/comando`)."
+                    "entonces se puede utilizar como comando de aplicación (`/comando`).",
                 ),
                 (
                     "<argumento>",
@@ -340,7 +341,9 @@ class PaginatedHelpCommand(commands.HelpCommand):
         )
         await menu.start()
 
-    def get_usage_emojis(self, command: commands.HybridCommand | commands.HybridGroup) -> str:
+    def get_usage_emojis(
+        self, command: commands.HybridCommand | commands.HybridGroup
+    ) -> str:
         application_emoji = "<:application_command:1293248219266027591>"
         string = "<:prefixed_command:1293248180606996600>"
         if command.with_app_command and command.app_command:
@@ -411,39 +414,51 @@ class Meta(commands.Cog):
         bot = self.bot
         command = interaction.command
         if command is None:
-            raise ValueError('interaction does not have command data')
+            raise ValueError("interaction does not have command data")
         data = interaction.data
         if interaction.message is None:
             synthetic = {
-                'id': interaction.id,
-                'reactions': [],
-                'embeds': [],
-                'mention_everyone': False,
-                'tts': False,
-                'pinned': False,
-                'edited_timestamp': None,
-                'type': discord.MessageType.chat_input_command if data.get('type', 1) == 1 else discord.MessageType.context_menu_command,
-                'flags': 64,
-                'content': '',
-                'mentions': [],
-                'mention_roles': [],
-                'attachments': [],
+                "id": interaction.id,
+                "reactions": [],
+                "embeds": [],
+                "mention_everyone": False,
+                "tts": False,
+                "pinned": False,
+                "edited_timestamp": None,
+                "type": (
+                    discord.MessageType.chat_input_command
+                    if data.get("type", 1) == 1
+                    else discord.MessageType.context_menu_command
+                ),
+                "flags": 64,
+                "content": "",
+                "mentions": [],
+                "mention_roles": [],
+                "attachments": [],
             }
             if interaction.channel_id is None:
-                raise RuntimeError('interaction channel ID is null, this is probably a Discord bug')
+                raise RuntimeError(
+                    "interaction channel ID is null, this is probably a Discord bug"
+                )
             channel = interaction.channel or discord.PartialMessageable(
-                state=interaction._state, guild_id=interaction.guild_id, id=interaction.channel_id
+                state=interaction._state,
+                guild_id=interaction.guild_id,
+                id=interaction.channel_id,
             )
-            message = discord.Message(state=interaction._state, channel=channel, data=synthetic)
+            message = discord.Message(
+                state=interaction._state, channel=channel, data=synthetic
+            )
             message.author = interaction.user
-            message.attachments = [a for _, a in interaction.namespace if isinstance(a, discord.Attachment)]
+            message.attachments = [
+                a for _, a in interaction.namespace if isinstance(a, discord.Attachment)
+            ]
         else:
             message = interaction.message
-        prefix = '/' if data.get('type', 1) == 1 else '\u200b'
+        prefix = "/" if data.get("type", 1) == 1 else "\u200b"
         ctx = Context(
             message=message,
             bot=bot,
-            view=StringView(''),
+            view=StringView(""),
             args=[],
             kwargs={},
             prefix=prefix,
@@ -457,7 +472,9 @@ class Meta(commands.Cog):
 
     @discord.app_commands.command(name="help")
     @discord.app_commands.checks.cooldown(1, 30, key=lambda i: (i.guild_id, i.user.id))
-    async def slash_help(self, interaction: discord.Interaction, *, command: str | None = None) -> Any:
+    async def slash_help(
+        self, interaction: discord.Interaction, *, command: str | None = None
+    ) -> Any:
         """Muestra ayuda de un comando, grupo o categoría."""
         context = await self.bot.get_context(interaction)
         self.paginated_help_command.context = context
@@ -515,20 +532,24 @@ class Meta(commands.Cog):
 
     @staticmethod
     def format_relative(dt: datetime.datetime) -> str:
-        return discord.utils.format_dt(dt, 'R')
+        return discord.utils.format_dt(dt, "R")
 
     def format_commit(self, commit: pygit2.Commit) -> str:
-        short, _, _ = commit.message.partition('\n')
+        short, _, _ = commit.message.partition("\n")
         short_sha2 = commit.short_id
-        commit_tz = datetime.timezone(datetime.timedelta(minutes=commit.commit_time_offset))
-        commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(commit_tz)
+        commit_tz = datetime.timezone(
+            datetime.timedelta(minutes=commit.commit_time_offset)
+        )
+        commit_time = datetime.datetime.fromtimestamp(commit.commit_time).astimezone(
+            commit_tz
+        )
         offset = self.format_relative(commit_time.astimezone(datetime.timezone.utc))
-        return f'[`{short_sha2}`](https://github.com/SpaceBot-Development-Team/space/commit/{commit.id}) {short} ({offset})'
+        return f"[`{short_sha2}`](https://github.com/SpaceBot-Development-Team/space/commit/{commit.id}) {short} ({offset})"
 
     async def get_latest_commits(self, count: int = 3) -> str:
-        repo = pygit2.Repository('.git')
+        repo = pygit2.Repository(".git")
         commits = list(itertools.islice(repo.walk(repo.head.target, pygit2.GIT_SORT_TOPOLOGICAL), count))  # type: ignore
-        return '\n'.join(self.format_commit(commit) for commit in commits)
+        return "\n".join(self.format_commit(commit) for commit in commits)
 
     @command(name="stats")
     @commands.cooldown(1, 15, commands.BucketType.member)
@@ -540,10 +561,10 @@ class Meta(commands.Cog):
         try:
             revision = await self.get_latest_commits()
         except Exception:
-            revision = '*Ninguno... de momento*'
-        embed = discord.Embed(description='Cambios más recientes:\n' + revision)
-        embed.title = 'Invitación al Servidor de Soporte Oficial'
-        embed.url = 'https://discord.gg/m9UsWuaYDT'
+            revision = "*Ninguno... de momento*"
+        embed = discord.Embed(description="Cambios más recientes:\n" + revision)
+        embed.title = "Invitación al Servidor de Soporte Oficial"
+        embed.url = "https://discord.gg/m9UsWuaYDT"
         embed.colour = self.bot.default_color
 
         total_members = 0
@@ -564,17 +585,19 @@ class Meta(commands.Cog):
                 elif isinstance(channel, discord.VoiceChannel):
                     voice += 1
 
-        embed.add_field(name='Miembros', value=f'{total_members} en total\n{total_unique} únicos')
         embed.add_field(
-            name='Canales',
-            value=f'{text+voice} en total\n{text} canales de texto\n{voice} canales de voz',
+            name="Miembros", value=f"{total_members} en total\n{total_unique} únicos"
+        )
+        embed.add_field(
+            name="Canales",
+            value=f"{text+voice} en total\n{text} canales de texto\n{voice} canales de voz",
         )
 
         version = discord.__version__
-        embed.add_field(name='Servidores', value=guilds)
+        embed.add_field(name="Servidores", value=guilds)
         embed.set_footer(
-            text=f'Hecho en discord.py v{version} con 💖 por @dev_anony',
-            icon_url='http://i.imgur.com/5BFecvA.png',
+            text=f"Hecho en discord.py v{version} con 💖 por @dev_anony",
+            icon_url="http://i.imgur.com/5BFecvA.png",
         )
         embed.timestamp = discord.utils.utcnow()
         await ctx.reply(embed=embed)
@@ -582,6 +605,7 @@ class Meta(commands.Cog):
 
 class CodeModal(discord.ui.Modal):
     """Modal for app_commands evaluate command"""
+
     def __init__(self, bot: Bot, user_id: int, guild_id: int) -> None:
         self.bot: Bot = bot
         super().__init__(

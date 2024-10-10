@@ -152,7 +152,7 @@ class Context(_CTX):
     ) -> discord.Message:
         if content is not None and self.interaction:
             command: discord.app_commands.Command = self.interaction.command  # type: ignore
-            if command.extras.get('translate_response', False):
+            if command.extras.get("translate_response", False):
                 translated_content = await self.interaction.translate(content)
                 if translated_content is not None:
                     content = translated_content

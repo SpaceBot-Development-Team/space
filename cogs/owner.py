@@ -6,6 +6,10 @@ import asyncio
 import copy
 import time
 import traceback
+import sys
+import logging
+import importlib
+import os
 
 from jishaku.paginators import PaginatorEmbedInterface
 from discord.ext.commands.cog import Cog
@@ -15,6 +19,8 @@ from _types import Context, Bot
 
 if TYPE_CHECKING:
     from typing_extensions import Self
+
+logger = logging.getLogger(__name__)
 
 
 class PerfMocker:
@@ -127,6 +133,104 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
         await ctx.reply(
             f"Status: {ctx.tick(success)} Tiempo de ejecución: {(end-start) * 1000:.2f}ms"
         )
+
+    IMPORT_STRINGS = (
+        "from {} import",
+        "import {}",
+        "__import__({}",
+        "from .{} import",
+        "import .{}",
+    )
+
+    def _resolve_relative_import(self, path: str, rel_import: str) -> str:
+        """Converts a relative import (i.e.: from .warns on the cogs folder) to an absolute import
+        based of the file path where the import has occurred.
+        """
+        dir = os.path.dirname(path)
+        base_module = dir.replace(os.sep, ".").lstrip(".")
+        return f"{base_module}.{rel_import}"
+
+    def _reload_module_and_importers(
+        self, module_name: str, search_path: str = "."
+    ) -> None:
+        """Reloads a module and every file in the local machine that import it.
+        Handles relative imports.
+        """
+
+        module = __import__(module_name)
+        importlib.reload(module)
+
+        for root, _, files in os.walk(search_path):
+            for file in files:
+                if not file.endswith(".py"):
+                    continue
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as file_buffer:
+                        content = file_buffer.read().replace("\n", " ")
+                        found_import = False
+                        # This constant is True if the file imports, in any way, the module
+                        # that was reloaded.
+
+                        for import_string in self.IMPORT_STRINGS:
+                            if import_string.format(module_name) in content:
+                                found_import = True
+                                break
+                            if f'.{module_name.split(".")[-1]}' in content:
+                                rel = module_name.split(".")[-1]
+                                abs = self._resolve_relative_import(file_path, rel)
+                                if abs in sys.modules:
+                                    found_import = True
+                                    break
+
+                        if found_import:
+                            rel_path = os.path.relpath(file_path, search_path)
+                            mod_name_from_file = os.path.splitext(rel_path.replace(os.sep, "."))[0]
+                            if mod_name_from_file in sys.modules:
+                                logger.debug(
+                                    'Reloaded module %s for total reload of %s',
+                                    mod_name_from_file,
+                                    module_name,
+                                )
+                                importlib.reload(sys.modules[mod_name_from_file])
+                except Exception as exc:
+                    logger.error(
+                        'Error occurred while reloading module %s for total reload of %s. Traceback:\n%s',
+                        file_path,
+                        module_name,
+                        traceback.format_exception(
+                            type(exc), exc, exc.__traceback__,
+                        ),
+                    )
+                    raise exc
+        logger.info('Successfully reloaded module %s and all files that import it', module_name)
+
+    @discord.utils.copy_doc(_reload_module_and_importers)
+    async def reload_module_and_importers(
+        self, module_name: str, search_path: str = "."
+    ) -> None:
+        return await self.bot.loop.run_in_executor(
+            None, self._reload_module_and_importers, module_name, search_path
+        )
+
+    @commands.command(hidden=True)
+    async def hotreload(self, ctx: Context, *, module: str) -> None:
+        """Recarga un módulo, recargando de paso todos los archivos que lo importan."""
+
+        if module.startswith('cogs.') and module in self.bot.extensions.keys():  # Module is a cog, then
+            await self.bot.reload_extension(module)
+        ret = await ctx.reply(f"Recargando módulo ``{module}``")
+        try:
+            await self.reload_module_and_importers(module)
+        except Exception as exc:
+            err = await ctx.safe_send(
+                f"Un error ocurrió:\n{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
+            )
+            await ret.edit(
+                content=f"Un error ocurrió, [ve al mensaje de error]({err.jump_url})",
+            )
+        else:
+            await ret.edit(content="¡Recargado exitósamente!",)
 
 
 async def setup(bot: Bot) -> None:

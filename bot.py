@@ -28,7 +28,6 @@ import os
 import logging
 
 from _types import Bot
-from models import Guild
 
 import discord
 import aiohttp
@@ -44,15 +43,15 @@ except KeyError as exc:
         "Could not initialize bot because the environment was not set"
     ) from exc
 
-if '.git' not in os.listdir('.'):
+if ".git" not in os.listdir("."):
     INITIALIZE_GIT_HISTORY = [
-        'git init',
-        'git remote add bot_source https://github.com/SpaceBot-Development-Team/space.git',
-        'git branch -M master',
-        'git config user.name SpaceBotLauncher',
-        'git add .',
+        "git init",
+        "git remote add bot_source https://github.com/SpaceBot-Development-Team/space.git",
+        "git branch -M master",
+        "git config user.name SpaceBotLauncher",
+        "git add .",
         'git commit -m "Never commited changes"',
-        'git pull bot_source master',
+        "git pull bot_source master",
     ]
     for command in INITIALIZE_GIT_HISTORY:
         os.system(command)
@@ -90,6 +89,15 @@ os.environ["JISHAKU_NO_DM_TRACEBACK"] = "True"
 os.environ["JISHAKU_HIDE"] = "True"
 
 
+async def create_tables_for(guild: discord.Guild) -> None:
+    from models import Guild, SuggestionsConfig, VouchsConfig, WarnsConfig
+    tables = (Guild, SuggestionsConfig, VouchsConfig, WarnsConfig)
+    for table in tables:
+        if not await table.exists(id=guild.id):
+            await table.create(id=guild.id)
+    bot.logger.info('Ensured all guild related configs for %s', guild.id)
+
+
 @bot.event
 async def on_ready() -> None:
     """Event called when client is ready or resumed a session"""
@@ -104,13 +112,11 @@ async def on_guild_join(guild: discord.Guild) -> None:
     async for entry in guild.audit_logs(limit=2, action=discord.AuditLogAction.bot_add):
         if entry.user is not None:
             await entry.user.send(embed=bot.thanks_for_adding())
+    await create_tables_for(guild)
 
-    if not await Guild.exists(id=guild.id):
-        await Guild(
-            id=guild.id,
-            enabled=True,
-            prefix="!",
-        ).save()
+@bot.event
+async def on_guild_available(guild: discord.Guild):
+    await create_tables_for(guild)
 
 
 async def runner():

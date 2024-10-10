@@ -52,7 +52,9 @@ async def strike_autocomplete(
     if user is None:  # If user not set yet
         return [
             app_commands.Choice(
-                name=locale_str("Escoge al staff que sancionar antes de que strike quitar"),
+                name=locale_str(
+                    "Escoge al staff que sancionar antes de que strike quitar"
+                ),
                 value="none",
             )
         ]
@@ -62,7 +64,11 @@ async def strike_autocomplete(
     )
 
     if not config or not config.strikes:
-        return [app_commands.Choice(name=locale_str("Este staff no tiene strikes"), value="none")]
+        return [
+            app_commands.Choice(
+                name=locale_str("Este staff no tiene strikes"), value="none"
+            )
+        ]
 
     choices: List[app_commands.Choice] = []
 
