@@ -65,6 +65,7 @@ extensions: list[str] = [
     "cogs.user_installable",
     "cogs.suggestions",
     "cogs.warns",
+    "cogs.guild_commands.limited_guilds",
 ]  # 'cogs.music',]
 Bot.cog_emojis = {
     "Vouchs": "<:vouch:1241434529491587193>",

@@ -24,9 +24,10 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from discord import Interaction, DMChannel, GroupChannel, Guild, Member, User
+from typing import TypeVar
+
+from discord import Interaction, DMChannel, GroupChannel, Guild, Member, User, Client
 from discord.abc import GuildChannel
-from discord.enums import Enum
 
 __all__ = (
     "DMInteraction",
@@ -36,20 +37,29 @@ __all__ = (
 
 # fmt: off
 
-class DMInteraction(Interaction):
+# We use a different typevar per each class as using the same could make the
+# type checker go crazy on some machines.
+D = TypeVar('D', bound='Client')
+P = TypeVar('P', bound='Client')
+G = TypeVar('G', bound='Client')
+
+class DMInteraction(Interaction[D]):
     guild: None
+    guild_id: None
+    guild_locale: None
     channel: DMChannel
     user: User
 
 
-class PrivateChannelInteraction(Interaction):
+class PrivateChannelInteraction(Interaction[P]):
     guild: None
     channel: GroupChannel
     user: User
 
 
-class GuildInteraction(Interaction):
+class GuildInteraction(Interaction[G]):
     guild: Guild
+    guild_id: int
     channel: GuildChannel
     user: Member
 
