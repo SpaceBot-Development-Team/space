@@ -353,7 +353,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
                     return string
                 case discord.app_commands.Command:
                     return application_emoji
-                case (commands.HelpCommand, commands.DefaultHelpCommand, commands.MinimalHelpCommand):
+                case (commands.help._HelpCommandImpl, commands.HelpCommand, commands.MinimalHelpCommand, commands.DefaultHelpCommand):
                     return string + application_emoji
         if command.with_app_command and command.app_command:
             string += application_emoji
