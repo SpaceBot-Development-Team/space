@@ -89,7 +89,7 @@ class GroupHelpPageSource(menus.ListPageSource):
         )
 
         for command in commands:
-            signature = f"{command.qualified_name} {command.signature}"
+            signature = f"{PaginatedHelpCommand.get_usage_emojis(command)} {command.qualified_name} {command.signature}"
             embed.add_field(
                 name=signature,
                 value=command.short_doc or "Sin ayuda corta",
@@ -307,7 +307,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
             alias = fmt
         else:
             alias = command.name if not parent else f"{parent} {command.name}"
-        return f"{alias} {command.signature}"
+        return f"{self.get_usage_emojis(command)} {alias} {command.signature}"
 
     async def send_bot_help(self, mapping: Mapping):
         bot = self.context.bot
@@ -331,7 +331,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
 
         menu = HelpMenu(FrontPageSource(), ctx=self.context)
         menu.add_categories(all_commands)
-        await menu.start()
+        await menu.start(content=None)
 
     async def send_cog_help(self, cog):
         entries = await self.filter_commands(cog.get_commands(), sort=True)
@@ -339,13 +339,22 @@ class PaginatedHelpCommand(commands.HelpCommand):
             GroupHelpPageSource(cog, entries, prefix=self.context.clean_prefix),
             ctx=self.context,
         )
-        await menu.start()
+        await menu.start(content=None)
 
+    @staticmethod
     def get_usage_emojis(
-        self, command: commands.HybridCommand | commands.HybridGroup
+        command: commands.HybridCommand | commands.HybridGroup
     ) -> str:
-        application_emoji = "<:application_command:1293248219266027591>"
-        string = "<:prefixed_command:1293248180606996600>"
+        application_emoji = "<:application_command:1295442981129682945>"
+        string = "<:prefixed_command:1295442979502428351>"
+        if not isinstance(command, commands.HybridCommand):
+            match type(command):
+                case commands.Command:
+                    return string
+                case discord.app_commands.Command:
+                    return application_emoji
+                case (commands.HelpCommand, commands.DefaultHelpCommand, commands.MinimalHelpCommand):
+                    return string + application_emoji
         if command.with_app_command and command.app_command:
             string += application_emoji
         return string
@@ -357,7 +366,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
     ):
         embed_like.title = self.get_command_signature(command)
         if command.description:
-            embed_like.description = f"{self.get_usage_emojis(command)} {command.description}\n\n{command.help}"
+            embed_like.description = f"{command.description}\n\n{command.help}"
         else:
             embed_like.description = command.help or "Sin ayuda corta"
 
@@ -367,7 +376,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         # No pagination necessary for a single command.
         embed = discord.Embed(colour=discord.Colour(0xA8B9CD))
         self.common_command_formatting(embed, command)
-        await self.context.send(embed=embed)
+        await self.context.send(content=None, embed=embed)
 
     async def send_group_help(self, group: commands.HybridGroup):
         subcommands = group.commands
@@ -381,7 +390,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         source = GroupHelpPageSource(group, entries, prefix=self.context.clean_prefix)
         self.common_command_formatting(source, group)
         menu = HelpMenu(source, ctx=self.context)
-        await menu.start()
+        await menu.start(content=None)
 
 
 class Meta(commands.Cog):

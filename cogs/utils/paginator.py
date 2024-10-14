@@ -162,11 +162,11 @@ class SpacePages(discord.ui.View):
     ) -> None:
         if interaction.response.is_done():
             await interaction.followup.send(
-                "Un error desconocido ha ocurrido, disculpas.", ephemeral=True
+                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}", ephemeral=True
             )
         else:
             await interaction.response.send_message(
-                "Un error desconocido ha ocurrido, disculpas.", ephemeral=True
+                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}", ephemeral=True
             )
 
     async def start(
