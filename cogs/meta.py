@@ -355,6 +355,8 @@ class PaginatedHelpCommand(commands.HelpCommand):
                     return application_emoji
                 case (commands.help._HelpCommandImpl, commands.HelpCommand, commands.MinimalHelpCommand, commands.DefaultHelpCommand):
                     return string + application_emoji
+        if not hasattr(command, 'with_app_command'):
+            return string
         if command.with_app_command and command.app_command:
             string += application_emoji
         return string
