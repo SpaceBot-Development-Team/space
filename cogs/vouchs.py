@@ -37,13 +37,11 @@ from discord.ext import (
 )
 
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
     List,
     Optional,
-    Sequence,
     TypeVar,
     ParamSpec,
     NamedTuple,
@@ -56,9 +54,6 @@ from _types import errors
 
 from models import Guild, VouchsConfig, VouchGuildUser
 from .utils.paginator import EmbedPaginator
-
-if TYPE_CHECKING:
-    from typing_extensions import Unpack
 
 # pylint: enable=wrong-import-order
 logger = logging.getLogger(__name__)
@@ -468,24 +463,6 @@ class Vouchs(commands.Cog):
             f"Se han quitado `{amount}` vouchs a {flags.user.mention}",
             allowed_mentions=discord.AllowedMentions.none(),
         )
-
-    @staticmethod
-    def _check(f: ModelDict, m: discord.Member) -> bool:
-        return f.user == m.id
-
-    def _get_mutual_items(
-        self,
-        first: Sequence[F],
-        second: Sequence[M],
-        *,
-        key: Optional[Callable[[F, M], bool]] = None,
-    ) -> Sequence[F]:
-        if key is None:
-            key = lambda f, m: f == m  # pylint: disable=unnecessary-lambda-assignment
-
-        mutual_items = [f for f in first if any(key(f, m) for m in second)]
-        self.bot.logger.debug("_get_mutual_items return %s", mutual_items)
-        return mutual_items
 
     @command()
     @commands.cooldown(1, 60, commands.BucketType.guild)

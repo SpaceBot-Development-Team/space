@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from _types.fields import WarnsDataField, Array, WarnsField
+from _types.fields import WarnsDataField, Array, WarnsField, CompositePrimaryKeyTable, composite_primary_keys
 from _types.warns import WarnConfig
 
 from tortoise import Model as Table
@@ -67,8 +67,9 @@ class Guild(Table):
 
 
 # GuildUser Table
-class GuildUser(Table):
-    guild = BigInt(primary_key=True)
+@composite_primary_keys("guild", "user")
+class GuildUser(CompositePrimaryKeyTable):
+    guild = BigInt()
     user = BigInt()
     warns = WarnsField(default={})
 
@@ -89,8 +90,9 @@ class VouchsConfig(Table):
 
 
 # VouchGuildUser Table
-class VouchGuildUser(Table):
-    guild = BigInt(primary_key=True)
+@composite_primary_keys("guild", "user")
+class VouchGuildUser(CompositePrimaryKeyTable):
+    guild = BigInt()
     user = BigInt()
     vouchs = BigInt(default=0)
     recent = Array[str](default=[])
@@ -113,8 +115,9 @@ class WarnsConfig(Table):
 
 
 # GuildApplication Table
-class GuildApplication(Table):
-    guild = BigInt(primary_key=True)
+@composite_primary_keys("guild", "name")
+class GuildApplication(CompositePrimaryKeyTable):
+    guild = BigInt()
     name = Varchar()
     questions = Array[dict[str, Any]](default=[])
     permissions = BigInt(default=0)
@@ -124,8 +127,9 @@ class GuildApplication(Table):
 
 
 # StrikeGuildStaff Table
-class StrikeGuildStaff(Table):
-    guild = BigInt(primary_key=True)
+@composite_primary_keys("guild", "user")
+class StrikeGuildStaff(CompositePrimaryKeyTable):
+    guild = BigInt()
     user = BigInt()
     total_strikes = Integer(default=0)
     strikes: dict[str, Any] = JSON(default={})
@@ -159,8 +163,9 @@ class EconomyConfig(Table):
 
 
 # EconomyGuildUser Table
-class EconomyGuildUser(Table):
-    guild = BigInt(primary_key=True)
+@composite_primary_keys("guild", "user")
+class EconomyGuildUser(CompositePrimaryKeyTable):
+    guild = BigInt()
     user = BigInt()
     money = BigInt(default=0)
     bank = BigInt(default=0)

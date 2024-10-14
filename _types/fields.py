@@ -24,17 +24,18 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Callable, Generic, Iterable, TypeVar
 
 from .warns import WarnConfig, Warn
-from .warns.types import WarnObject as WarnPayload
 
 from tortoise import Model
 from tortoise.fields import Field
 from tortoise.fields.data import JsonDumpsFunc, JsonLoadsFunc, JSON_LOADS, JSON_DUMPS
-from tortoise.exceptions import FieldError
+from tortoise.exceptions import FieldError, IncompleteInstanceError, IntegrityError
+from tortoise.backends.asyncpg.client import AsyncpgDBClient
 
 T = TypeVar("T")
+TM = TypeVar("TM", bound="CompositePrimaryKeyTable")
 
 
 class WarnsDataField(Field[dict], WarnConfig):
@@ -235,3 +236,112 @@ class WarnsField(Field[dict[str, Warn]], dict[str, Warn]):
             )
             new_dict[key] = obj
         return new_dict
+
+RESERVED_DB_NAMES = (
+    "user",
+)
+
+def composite_primary_keys(*keys: str) -> Callable[[TM], TM]:
+    """Adds a composite primary key to a model."""
+
+    def decorator(cls: TM) -> TM:
+        resolved_fields = dict.fromkeys(keys)
+        for name, field in cls._meta.fields_map.items():
+            if name in resolved_fields:
+                resolved_fields[name] = field
+        if "id" in cls._meta.fields_map:
+            field = cls._meta.fields_map["id"]
+            if field.pk:
+                try:
+                    cls._meta.fields.remove("id")
+                except KeyError:
+                    pass
+                cls._meta.fields_db_projection.pop("id", None)
+                cls._meta.fields_db_projection_reverse.pop("id", None)
+                try:
+                    cls._meta.db_fields.remove("id")
+                except KeyError:
+                    pass
+                if hasattr(cls, "id"):
+                    delattr(cls, "id")
+                del cls._meta.fields_map["id"]  # Remove autocreated pk
+        cls.__composite_primary_keys__ = keys
+        cls.__resolved_composite_primary_keys__ = resolved_fields
+        return cls
+    return decorator
+
+
+class CompositePrimaryKeyTable(Model):
+    """Represents a composite primary key table."""
+
+    __composite_primary_keys__: list[str]
+    __resolved_composite_primary_keys__: dict[str, Field]
+
+    async def save(
+        self,
+        using_db: AsyncpgDBClient | None = None,
+        update_fields: Iterable[str] | None = None,
+        force_create: bool = False,
+        force_update: bool = False,
+    ) -> None:
+        await self._set_async_default_field()
+        db = using_db or self._choose_db(True)
+        executor = db.executor_class(model=self.__class__, db=db)
+        if self._partial:
+            if update_fields:
+                for field in update_fields:
+                    if not hasattr(self, self._meta.pk_attr):
+                        raise IncompleteInstanceError(
+                            f'{self.__class__.__name__} is a partial model without a primary key fetched. Partial update not available'
+                        )
+                    if not hasattr(self, field):
+                        raise IncompleteInstanceError(
+                            f'{self.__class__.__name__} is a partial model, field {field!r} is not available'
+                        )
+            else:
+                raise IncompleteInstanceError(
+                    f'{self.__class__.__name__} is a partial model, can only be saved with the relevant update_field provided'
+                )
+        await self._pre_save(db, update_fields)
+        if force_create:
+            await executor.execute_insert(self)
+            created = True
+        elif force_update:
+            rows = await executor.execute_update(self, update_fields)
+            if not rows:
+                raise IntegrityError(f'Cannnot update object that does not exist. PKs: {self.__primary_keys__}')
+            created = False
+        else:
+            fields = self._meta.fields_map
+            s_pos = 1
+            s_pos_values: list[Any] = []
+            string = 'INSERT INTO "%s" (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;'
+            table_name = self._meta.db_table
+            safe_field_names = list(field if field not in RESERVED_DB_NAMES else f'"{field}"' for field in fields)
+            insert_fields_string = ', '.join(safe_field_names)
+            safe_pks_names = list(field.model_field_name if field.model_field_name not in RESERVED_DB_NAMES else f'"{field.model_field_name}"' for field in self.__resolved_composite_primary_keys__.values())
+            conflictive_pks = ', '.join(safe_pks_names)
+            insert_values_strings: list[str] = []
+            for field in safe_field_names:
+                value = getattr(self, field.replace('"', ""))
+                value_string = f'${s_pos}'
+                insert_values_strings.append(value_string)
+                s_pos += 1
+                s_pos_values.append(fields[field.replace('"', "")].to_db_value(value, self))
+            insert_values_string = ', '.join(insert_values_strings)
+            update_values_strings: list[str] = []
+            for field in safe_field_names:
+                if field in safe_pks_names:
+                    continue  # Ignore primary keys, they already exist if the DO UPDATE clause gets called
+
+                value = getattr(self, field)
+                value_string = f'{field}=${s_pos}'
+                update_values_strings.append((value_string))
+                s_pos += 1
+                s_pos_values.append(fields[field.replace('"', "")].to_db_value(value, self))
+            update_values_string = ', '.join(update_values_strings)
+            query = string % (table_name, insert_fields_string, insert_values_string, conflictive_pks, update_values_string)
+            await executor.db.execute_insert(query, s_pos_values)
+            created = True
+        self._saved_in_db = True
+        await self._post_save(db, created, update_fields)
