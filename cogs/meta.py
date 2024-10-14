@@ -345,8 +345,8 @@ class PaginatedHelpCommand(commands.HelpCommand):
     def get_usage_emojis(
         command: commands.HybridCommand | commands.HybridGroup
     ) -> str:
-        application_emoji = "<:application_command:1295442981129682945>"
-        string = "<:prefixed_command:1295442979502428351>"
+        application_emoji = "<:application_command:1293248219266027591>"
+        string = "<:prefixed_command:1293248180606996600>"
         if not isinstance(command, commands.HybridCommand):
             match type(command):
                 case commands.Command:
