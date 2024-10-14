@@ -334,7 +334,7 @@ class CompositePrimaryKeyTable(Model):
                 if field in safe_pks_names:
                     continue  # Ignore primary keys, they already exist if the DO UPDATE clause gets called
 
-                value = getattr(self, field)
+                value = getattr(self, field.replace('"', ""))
                 value_string = f'{field}=${s_pos}'
                 update_values_strings.append((value_string))
                 s_pos += 1
