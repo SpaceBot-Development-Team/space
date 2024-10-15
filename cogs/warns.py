@@ -353,7 +353,7 @@ class Warns(commands.Cog):
         """Called when a warn is removed"""
 
         config, _ = await WarnsConfig.get_or_create(
-            guild=data.guild.id,
+            id=data.guild.id,
         )
 
         if config.notifications is not None:
