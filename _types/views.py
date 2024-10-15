@@ -181,8 +181,7 @@ class WarningSelect(Select["SelectUserWarning"]):
             view=None,
             content=f"Se ha quitado la advertencia ID `{self.values[0]}` de <@{self.cfg.user}>. Su razón fue: `{warn.reason}`",
         )
-        new = Warn.from_data(id=self.values[0], data=warn, state=itx._state)
-        itx.client.dispatch("warn_remove", new)
+        itx.client.dispatch("warn_remove", itx.user, new)
         self.view.stop()  # type: ignore
 
 
