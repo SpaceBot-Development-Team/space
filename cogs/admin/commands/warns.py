@@ -171,7 +171,7 @@ class WarnsCommands:
             )
             await user.save()
             new = Warn.from_data(id=id, data=warn.to_dict(), state=ctx._state)
-            self.bot.dispatch("warn_remove", new)
+            self.bot.dispatch("warn_remove", ctx.author, new)
             return
 
         view = SelectUserWarning(user, ctx.author)

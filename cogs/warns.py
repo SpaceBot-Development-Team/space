@@ -274,9 +274,11 @@ class Warns(commands.Cog):
 
     @commands.Cog.listener("on_warn_add")
     async def on_warn_add(
-        self, data: Warn, user_data: GuildUser, config: WarnsConfig
+        self, data: Warn,
     ) -> Any:
         """Called when a warn is added"""
+        user_data, _ = await GuildUser.get_or_create(user=data.target.id, guild=data.guild.id)
+        config, _ = await WarnsConfig.get_or_create(id=data.guild.id)
 
         warn_amount = len(user_data.warns.keys())
         if config.notifications is not None:
@@ -347,14 +349,10 @@ class Warns(commands.Cog):
             )  # type: ignore
 
     @commands.Cog.listener()
-    async def on_warn_remove(self, data: Warn) -> Any:
+    async def on_warn_remove(self, remover: discord.User, data: Warn) -> Any:
         """Called when a warn is removed"""
 
         config, _ = await WarnsConfig.get_or_create(
-            guild=data.guild.id,
-        )
-        user, _ = await GuildUser.get_or_create(
-            user=data.target.id,
             guild=data.guild.id,
         )
 
@@ -366,38 +364,25 @@ class Warns(commands.Cog):
         else:
             partial = MockMessageable()
 
-        warn_amount = len(user.warns.keys())
-        roles, timeouts, *_ = config.config.get_punishments(
-            warn_amount
-        )  # if member was kicked or banned
-        # we won't do anything about it, just
-        # ignore, cuz ban, well, you're ban kid
-        # cry about it
+        await partial.send(embed=self.warn_removed_embed(remover, data))
 
-        if isinstance(data.guild, discord.Guild):
-            guild = data.guild
-            member = data.guild.get_member(data.target.id)
-        else:
-            guild = self.bot.get_guild(data.guild.id)
+    def warn_removed_embed(self, remover: discord.User, data: Warn) -> discord.Embed:
+        user_mention = f'<@{data.target.id}>'
+        staff_mention = f'<@{data.staff.id}>'
+        reason = data.reason
+        relative_created_at = discord.utils.format_dt(data.created_at, 'R')
+        absolute_created_at = discord.utils.format_dt(data.created_at, 'f')
+        embed = discord.Embed(colour=self.bot.default_color)
+        embed.title = 'Advertencia Eliminada'
+        embed.description = (
+            f'**Objetivo de la advertencia:** {user_mention} ({data.target.id})\n'
+            f'**Staff que creó la advertencia:** {staff_mention} ({data.staff.id})\n'
+            f'**Razón de la advertencia:** {reason}\n'
+            f'**Advertecia creada** {relative_created_at} ({absolute_created_at})\n'
+            f'**Advertencia quitada por:** {remover.mention} ({remover.id})'
+        )
+        return embed
 
-            if not guild:
-                _log.debug(
-                    "Discarding WARN_REMOVE event as not guild %s was found",
-                    data.guild.id,
-                )
-                return
-
-            member = guild.get_member(data.target.id)
-
-        if not member:
-            member = await guild.fetch_member(data.target.id)
-            guild._add_member(member)  # pylint: disable=protected-access
-
-        if roles:
-            to_remove = [role.role for role in roles if role.role is not None]
-            await member.remove_roles(
-                *to_remove, reason="Se le quitaron las advertencias"
-            )
 
 
 async def setup(bot: Bot) -> None:
