@@ -27,10 +27,6 @@ from __future__ import annotations
 from functools import partial
 import io
 
-import random
-
-import urllib.parse
-
 from typing import ClassVar, Literal, TypeAlias, Union
 
 import discord
@@ -53,10 +49,10 @@ class Fun(discord.ext.commands.GroupCog, name="fun"):
     def __init__(self, bot: Bot) -> None:
         self.bot: Bot = bot
         self._request_headers: dict[str, str] = {
-            "Authorization": "Bearer " + bot.get_token("Jeyy"),
+            "Authorization": "Bearer " + bot.get_token("Jeyy"),  # type: ignore
             "accept": "application/json",
         }
-        self._parser = urllib.parse.quote
+        self._parser = lambda s: s
         self.session_get = partial(self.bot.session.get, headers=self._request_headers)
 
     @staticmethod
