@@ -15,7 +15,7 @@ class TicTacToeButton(discord.ui.Button["TicTacToeView"]):
         self.x = x
         self.y = y
 
-    async def callback(self, itx: discord.Interaction) -> None:
+    async def callback(self, itx: discord.Interaction) -> None:  # type: ignore
         assert self.view is not None
 
         view: "TicTacToeView" = self.view
@@ -61,19 +61,19 @@ class TicTacToeButton(discord.ui.Button["TicTacToeView"]):
 
 
 class TicTacToeView(discord.ui.View):
-    children: list[TicTacToeButton]
+    children: list[TicTacToeButton]  # type: ignore
 
     X = -1
     O = 1
     Tie = 2
 
-    def __init__(self, x: discord.Member, o: discord.Member) -> None:
+    def __init__(self, xs: discord.Member, os: discord.Member) -> None:
         super().__init__(timeout=None)
 
         self.current_player = self.X
 
-        self.XPlayer = x
-        self.OPlayer = o
+        self.XPlayer = xs
+        self.OPlayer = os
 
         self.board = [
             [0, 0, 0],

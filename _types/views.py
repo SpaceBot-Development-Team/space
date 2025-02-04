@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-from typing import Final, List, Tuple, TypeVar, Callable
+from typing import Any, Final, List, Tuple, TypeVar, Callable
 
 import copy
 import re
@@ -138,17 +138,42 @@ class BaseView(ViewT):
     ) -> int:
         return entitlement.sku_id
 
-    def is_premium_interaction(self, interaction: Interaction) -> bool:
+    def is_premium_interaction(self, interaction: Interaction[Any]) -> bool:
         entitlement_sku_ids = map(
             self._map_interaction_entitlements_sku_ids, interaction.entitlements
         )
-        if SPACE_PREMIUM_SKU_ID not in entitlement_sku_ids:
-            return False
+        return SPACE_PREMIUM_SKU_ID in entitlement_sku_ids
 
     def create_sku_required_view(self, sku_id: int) -> ViewT:
         view = ViewT()
         view.add_item(Button(style=ButtonStyle.premium, sku_id=sku_id))
         return view
+
+    def create_premium_required_view(self) -> ViewT:
+        return self.create_sku_required_view(SPACE_PREMIUM_SKU_ID)
+
+
+class BaseModal(discord.ui.Modal):
+    def _map_interaction_entitlements_sku_ids(
+        self, entitlement: discord.Entitlement,
+    ) -> int:
+        return entitlement.sku_id
+
+    def is_premium_interaction(self, interaction: Interaction) -> bool:
+        entitlement_sku_ids = map(
+            self._map_interaction_entitlements_sku_ids, interaction.entitlements
+        )
+        return SPACE_PREMIUM_SKU_ID in entitlement_sku_ids
+
+    def create_sku_required_view(self, sku_id: int) -> ViewT:
+        view = ViewT()
+        view.add_item(
+            Button(style=ButtonStyle.premium, sku_id=sku_id)
+        )
+        return view
+
+    def create_premium_required_view(self) -> ViewT:
+        return self.create_sku_required_view(SPACE_PREMIUM_SKU_ID)
 
 
 class WarningSelect(Select["SelectUserWarning"]):

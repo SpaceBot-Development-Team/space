@@ -138,7 +138,7 @@ def command(
     *,
     with_app_command: bool = True,
     **kwargs,
-) -> Callable[[CommandCallback[CogT, ContextT, P, T]], HybridCommand[CogT, P, T]]:  # type: ignore
+) -> Callable[[Any], HybridCommand[CogT, P, T]]:  # type: ignore
     def decorator(func: CommandCallback[CogT, ContextT, P, T]) -> HybridCommand[CogT, P, T]:  # type: ignore
         if isinstance(func, Command):
             raise TypeError("Callback is already a command.")
@@ -156,7 +156,7 @@ def group(
     *,
     with_app_command: bool = True,
     **kwargs,
-) -> Callable[[CommandCallback[CogT, ContextT, P, T]], HybridGroup[CogT, P, T]]:  # type: ignore
+) -> Callable[[Any], HybridGroup[CogT, P, T]]:  # type: ignore
     def decorator(func: CommandCallback[CogT, ContextT, P, T]) -> HybridGroup[CogT, P, T]:  # type: ignore
         if isinstance(func, Command):
             raise TypeError("Callback is already is command.")

@@ -24,9 +24,15 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
-from _types.fields import WarnsDataField, Array, WarnsField, CompositePrimaryKeyTable, composite_primary_keys
+from _types.fields import (
+    WarnsDataField,
+    WarnsField,
+    CompositePrimaryKeyTable,
+    composite_primary_keys,
+)
 from _types.warns import WarnConfig
 
 from tortoise import Model as Table
@@ -36,6 +42,27 @@ from tortoise.fields import (
     TextField as Varchar,
     JSONField as JSON,
     IntField as Integer,
+    Field,
+)
+from tortoise.contrib.postgres.fields import ArrayField as Array
+
+BigIntArray: partial[Field[list[int]]] = partial(Array, 'bigint')
+VarcharArray: partial[Field[list[str]]] = partial(Array, 'char')
+JSONBArray: partial[Field[dict[str, Any] | list[Any]]] = partial(Array, 'jsonb')
+
+__all__ = (
+    'User',
+    'Guild',
+    'GuildUser',
+    'VouchsConfig',
+    'VouchGuildUser',
+    'WarnsConfig',
+    'GuildApplication',
+    'StrikeGuildStaff',
+    'UserTagsPrivate',
+    'BubuMissionsGuild',
+    'SuggestionsConfig',
+    'Suggestion',
 )
 
 
@@ -44,7 +71,7 @@ class User(Table):
     id = BigInt(primary_key=True)
     optedIn = Boolean(default=False)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "user"
 
 
@@ -54,15 +81,16 @@ class Guild(Table):
     enabled = Boolean(default=True)
     prefix = Varchar(default="!")
     alter = BigInt(null=True)
-    allowed_channels = Array[int](null=True)
-    allowed_roles = Array[int](null=True)
-    allowed_users = Array[int](null=True)
-    bypassed_users = Array[int](null=True)
-    bypassed_roles = Array[int](null=True)
+    allowed_channels = BigIntArray(null=True)
+    allowed_roles = BigIntArray(null=True)
+    allowed_users = BigIntArray(null=True)
+    bypassed_users = BigIntArray(null=True)
+    bypassed_roles = BigIntArray(null=True)
     user_report = BigInt(null=True)
     staff_report = BigInt(null=True)
+    locale = Varchar(default='es-ES', null=False)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "guild"
 
 
@@ -73,7 +101,7 @@ class GuildUser(CompositePrimaryKeyTable):
     user = BigInt()
     warns = WarnsField(default={})
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "guilduser"
 
 
@@ -82,10 +110,10 @@ class VouchsConfig(Table):
     id = BigInt(primary_key=True)
     enabled = Boolean(default=False)
     command_like = Boolean(default=True)
-    whitelisted_channels = Array[int](default=[])
+    whitelisted_channels = BigIntArray(default=[])
     multiplier = Integer(default=1)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "vouchsconfig"
 
 
@@ -95,9 +123,9 @@ class VouchGuildUser(CompositePrimaryKeyTable):
     guild = BigInt()
     user = BigInt()
     vouchs = BigInt(default=0)
-    recent = Array[str](default=[])
+    recent = VarcharArray(default=[])
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "vouchguilduser"
 
 
@@ -107,10 +135,10 @@ class WarnsConfig(Table):
         primary_key=True,
     )
     enabled = Boolean(default=False)
-    config: WarnConfig = WarnsDataField(default=WarnConfig.empty())  # type: ignore
+    config: Field[WarnConfig] = WarnsDataField(default=WarnConfig.empty())  # type: ignore
     notifications = BigInt(null=True)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "warnsconfig"
 
 
@@ -119,10 +147,10 @@ class WarnsConfig(Table):
 class GuildApplication(CompositePrimaryKeyTable):
     guild = BigInt()
     name = Varchar()
-    questions = Array[dict[str, Any]](default=[])
+    questions = JSONBArray(default=[])
     permissions = BigInt(default=0)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "guildapplication"
 
 
@@ -132,46 +160,10 @@ class StrikeGuildStaff(CompositePrimaryKeyTable):
     guild = BigInt()
     user = BigInt()
     total_strikes = Integer(default=0)
-    strikes: dict[str, Any] = JSON(default={})
+    strikes: Field[dict[str, Any]] = JSON(default={})  # type: ignore
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "strikeguildstaff"
-
-
-# EconomyConfig Table
-class EconomyConfig(Table):
-    id = BigInt(
-        primary_key=True,
-    )
-    enabled = Boolean(default=True)
-    currency = Varchar(default="€")
-    work_responses = Array[str](
-        default=["Has trabajado duro y has ganado {currency}{money}"]
-    )
-    public_stats = Boolean(default=False)
-    rob_responses: dict[str, list[str]] = JSON(
-        default={
-            "0": [
-                "¡Has intentado robar a {robbed}, pero te pillaron y te multaron por {amount}!"
-            ],
-            "1": ["¡Has robado {amount} a {robbed}!"],
-        }
-    )
-
-    class Meta:
-        table = "economyconfig"
-
-
-# EconomyGuildUser Table
-@composite_primary_keys("guild", "user")
-class EconomyGuildUser(CompositePrimaryKeyTable):
-    guild = BigInt()
-    user = BigInt()
-    money = BigInt(default=0)
-    bank = BigInt(default=0)
-
-    class Meta:
-        table = "economyguilduser"
 
 
 # UserTagsPrivate Table
@@ -179,9 +171,9 @@ class UserTagsPrivate(Table):
     id = BigInt(
         primary_key=True,
     )
-    tags: dict[str, Any] | None = JSON(null=True, default=None)
+    tags: Field[dict[str, Any] | None] = JSON(null=True, default=None)  # type: ignore
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "usertagsprivate"
 
 
@@ -191,7 +183,7 @@ class BubuMissionsGuild(Table):
         primary_key=True,
     )
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "bubumissionsguild"
 
 
@@ -206,32 +198,14 @@ class SuggestionsConfig(Table):
     staff_role = BigInt(null=True)
     allow_selfvote = Boolean(default=True)
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "suggestionsconfig"
 
 
 # Suggestion Table
 class Suggestion(Table):
     id = BigInt(primary_key=True)
-    voted_users = Array[int](default=[])
+    voted_users = Array(default=[])
 
-    class Meta:
+    class Meta:  # type: ignore
         table = "suggestionmessage"
-
-
-# Future feature
-# class Giveaway(Table):
-#    message = BigInt(primary_key=True)  # message ID are unique anyways :shrug:
-#    guild = BigInt(null=False)
-#    channel = BigInt(null=False)
-#    prize = Varchar(null=False)
-#    winner_amount = BigInt()
-#    duration = BigInt()
-#    ended = Boolean(default=False)
-#    start = Timestamp()
-#    end = Timestamp(null=True)
-#    winners = Array(base_column=BigInt(), default=[])
-#    host = BigInt(null=False)
-
-#    class Meta:
-#        table = "giveaway"

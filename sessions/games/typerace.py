@@ -24,11 +24,12 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-import copy
 import asyncio
 from typing import TYPE_CHECKING, Any, List
 
 import discord
+
+from _types.interactions import GuildInteraction
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -102,9 +103,9 @@ class LFPView(discord.ui.View):
         emoji=discord.PartialEmoji.from_str("<:icon_thumbs_up:1249377442116796497>"),
         style=discord.ButtonStyle.primary,
         row=0,
-    )
+    )  # type: ignore
     async def join_game(
-        self, interaction: discord.Interaction, button: discord.ui.Button[LFPView]
+        self, interaction: GuildInteraction, button: discord.ui.Button[LFPView]
     ) -> None:
         """Joins the game"""
 

@@ -21,46 +21,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
-
 from __future__ import annotations
 
-from typing import TypeVar
+# This copies the try_enum function from @Rapptz/discord.py discord/enums.py file
+# so the code does not break if any changes in that function or related are made.
 
-from discord import Interaction, DMChannel, GroupChannel, Guild, Member, User, Client
-from discord.abc import GuildChannel
+from typing import Any, TypeVar
 
-__all__ = (
-    "DMInteraction",
-    "PrivateChannelInteraction",
-    "GuildInteraction",
-)
+from discord.enums import Enum
 
-# fmt: off
+E = TypeVar('E', bound=Enum)
 
-# We use a different typevar per each class as using the same could make the
-# type checker go crazy on some machines.
-D = TypeVar('D', bound='Client')
-P = TypeVar('P', bound='Client')
-G = TypeVar('G', bound='Client')
+def create_unknown_value(cls: type[E], value: Any) -> E:
+    value_cls = cls._enum_value_cls_  # type: ignore
+    name = f'unknown_{value}'
+    return value_cls(name=name, value=value)
 
-class DMInteraction(Interaction[D]):
-    guild: None  # type: ignore
-    guild_id: None  # type: ignore
-    guild_locale: None  # type: ignore
-    channel: DMChannel  # type: ignore
-    user: User  # type: ignore
-
-
-class PrivateChannelInteraction(Interaction[P]):
-    guild: None  # type: ignore
-    channel: GroupChannel  # type: ignore
-    user: User  # type: ignore
-
-
-class GuildInteraction(Interaction[G]):
-    guild: Guild  # type: ignore
-    guild_id: int  # type: ignore
-    channel: GuildChannel  # type: ignore
-    user: Member  # type: ignore
-
-# fmt: on
+def try_enum(cls: type[E], value: Any) -> E:
+    try:
+        return cls._enum_value_map_[value]  # type: ignore
+    except (KeyError, TypeError, AttributeError):
+        return create_unknown_value(cls, value)

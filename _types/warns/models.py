@@ -376,13 +376,13 @@ class WarnAction:
     def to_dict(self) -> WarnRolePayload: ...
 
     @overload
-    def to_dict(self) -> WarnTimeoutPayload: ...
+    def to_dict(self) -> WarnTimeoutPayload: ...  # type: ignore
 
     @overload
     def to_dict(self) -> Union[WarnKickPayload, WarnBanPayload]:  # type: ignore
         ...
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:  # type: ignore
         if self.type == ActionType.role:
             if not self.role:
                 raise ValueError("role can't be none on role type based warn actions")

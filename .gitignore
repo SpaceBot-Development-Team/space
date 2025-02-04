@@ -163,3 +163,7 @@ cython_debug/
 
 # Testing files
 beta.py
+tests/
+
+# Visual Studio Code Settings Path
+.vscode/

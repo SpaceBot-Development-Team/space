@@ -107,9 +107,9 @@ class AdminContextMenus(commands.Cog):
 
         user_warns.update(
             {
-                warn_id: warn,
+                warn_id: warn,  # type: ignore
             }
-        )
+        )  # type: ignore
 
         user_config.warns = user_warns
 

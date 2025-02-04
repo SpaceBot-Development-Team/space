@@ -30,7 +30,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from models import Suggestion
+from models import Suggestion, SuggestionsConfig
 from _types import group
 from .checks import ensure_config
 from .utils import get_config

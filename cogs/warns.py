@@ -190,7 +190,7 @@ class Warns(commands.Cog):
     async def cog_unload(self) -> None:
         for command in self._context_menu_holder.context_menus:
             self.bot.tree.remove_command(command.name, type=command.type)
-            self._context_menu_holder.remove_command(command)
+            self._context_menu_holder.remove_menu(command.name)
 
     @overload
     def _log_embed(
@@ -274,10 +274,13 @@ class Warns(commands.Cog):
 
     @commands.Cog.listener("on_warn_add")
     async def on_warn_add(
-        self, data: Warn,
+        self,
+        data: Warn,
     ) -> Any:
         """Called when a warn is added"""
-        user_data, _ = await GuildUser.get_or_create(user=data.target.id, guild=data.guild.id)
+        user_data, _ = await GuildUser.get_or_create(
+            user=data.target.id, guild=data.guild.id
+        )
         config, _ = await WarnsConfig.get_or_create(id=data.guild.id)
 
         warn_amount = len(user_data.warns.keys())
@@ -302,6 +305,11 @@ class Warns(commands.Cog):
             data.target = MockMember(
                 data.guild.id, data.target.id, self.bot._connection
             )
+
+        try:
+            assert isinstance(data.target, discord.Member)
+        except AssertionError:
+            return
 
         if bans:
             ban = bans[0]
@@ -367,22 +375,21 @@ class Warns(commands.Cog):
         await partial.send(embed=self.warn_removed_embed(remover, data))
 
     def warn_removed_embed(self, remover: discord.User, data: Warn) -> discord.Embed:
-        user_mention = f'<@{data.target.id}>'
-        staff_mention = f'<@{data.staff.id}>'
+        user_mention = f"<@{data.target.id}>"
+        staff_mention = f"<@{data.staff.id}>"
         reason = data.reason
-        relative_created_at = discord.utils.format_dt(data.created_at, 'R')
-        absolute_created_at = discord.utils.format_dt(data.created_at, 'f')
+        relative_created_at = discord.utils.format_dt(data.created_at, "R")
+        absolute_created_at = discord.utils.format_dt(data.created_at, "f")
         embed = discord.Embed(colour=self.bot.default_color)
-        embed.title = 'Advertencia Eliminada'
+        embed.title = "Advertencia Eliminada"
         embed.description = (
-            f'**Objetivo de la advertencia:** {user_mention} ({data.target.id})\n'
-            f'**Staff que creó la advertencia:** {staff_mention} ({data.staff.id})\n'
-            f'**Razón de la advertencia:** {reason}\n'
-            f'**Advertecia creada** {relative_created_at} ({absolute_created_at})\n'
-            f'**Advertencia quitada por:** {remover.mention} ({remover.id})'
+            f"**Objetivo de la advertencia:** {user_mention} ({data.target.id})\n"
+            f"**Staff que creó la advertencia:** {staff_mention} ({data.staff.id})\n"
+            f"**Razón de la advertencia:** {reason}\n"
+            f"**Advertecia creada** {relative_created_at} ({absolute_created_at})\n"
+            f"**Advertencia quitada por:** {remover.mention} ({remover.id})"
         )
         return embed
-
 
 
 async def setup(bot: Bot) -> None:

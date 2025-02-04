@@ -1,8 +1,12 @@
 """Custom Bot and CommandTree"""
 
 from __future__ import annotations
+import asyncio
 import logging
 import os
+import sys
+import string
+from hashlib import blake2b
 
 # pylint: disable=protected-access
 # pylint: disable=wrong-import-order
@@ -13,6 +17,7 @@ from asyncio import iscoroutinefunction
 
 import aiohttp
 import datetime
+import pathlib
 import traceback
 
 import discord
@@ -27,6 +32,7 @@ from discord import Emoji, PartialEmoji, app_commands as apps
 from discord.ext.commands.errors import ExtensionAlreadyLoaded
 from discord.ext import commands
 from tortoise import Tortoise
+import wavelink
 
 from .context import Context
 from .errors import SuggestionFailure, VouchFailure
@@ -35,8 +41,6 @@ from .translator import Translator
 
 from logging import Logger, INFO, getLogger
 
-
-import sys
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -198,6 +202,18 @@ class TreeCommand:
                 yield option  # type: ignore
 
 
+def _hash_payload(payload: list[dict[str, Any]]) -> bytes:
+    tree_hash = blake2b(digest_size=32, person=b"tree", last_node=True, usedforsecurity=(not sys.version_info < (3, 9)))
+    command_hashes = [
+        blake2b(discord.utils._to_json(c).encode(), person=b"command", last_node=False, usedforsecurity=(not sys.version_info < (3, 9))).digest()
+        for c in payload
+    ]
+    for h in sorted(command_hashes):
+        tree_hash.update(h)
+
+    return b"v1:" + tree_hash.digest()
+
+
 # pylint: disable=line-too-long
 class Tree(CommandTree):
     """🌳"""
@@ -211,6 +227,8 @@ class Tree(CommandTree):
         self.logger.setLevel(INFO)
         self._synced_guild_commands: dict[int, list[AppCommand]] = {}
         self._synced_commands: list[AppCommand] = []
+        self._cached_previous_hash: bytes | None = None
+        self.cached_hashes_path = pathlib.Path('.') / 'command-tree-hashes.dpy'
 
     async def copy_and_sync(self, guild: discord.Object) -> list[AppCommand]:
         """Copies the global commands into a guild and automatically sync them"""
@@ -222,7 +240,31 @@ class Tree(CommandTree):
 
         return self._synced_guild_commands[guild.id]
 
+    def __hash_loader(self) -> bytes:
+        with self.cached_hashes_path.open(mode="r+b") as fp:
+            return fp.read()
+
+    async def _hashes_differ(self, treehash: bytes) -> bool:
+        if self._cached_previous_hash is not None:
+            return self._cached_previous_hash != treehash
+
+        data = await self.client.loop.run_in_executor(None, self.__hash_loader)
+        return data != treehash
+
+    def __save_hashes(self, treehash: bytes) -> None:
+        with self.cached_hashes_path.open("w+b") as fp:
+            fp.write(treehash)
+
+    async def _save_hashes(self, treehash: bytes) -> None:
+        self._cached_previous_hash = treehash
+        await self.client.loop.run_in_executor(None, self.__save_hashes, treehash)
+
     async def sync(self, *, guild: discord.abc.Snowflake = discord.utils.MISSING) -> list[AppCommand]:  # type: ignore
+        if self.cached_hashes_path.exists():
+            treehash = await self.get_hash()
+            if not (await self._hashes_differ(treehash)):
+                return (self._synced_commands if guild is discord.utils.MISSING else self._synced_guild_commands[guild.id])
+
         if guild not in (discord.utils.MISSING, None):
             app_commands = await super().sync(guild=guild)
             to_append = []
@@ -239,12 +281,25 @@ class Tree(CommandTree):
             return self._synced_guild_commands[guild.id]
 
         self._synced_commands = await super().sync(guild=None)
+        if self.cached_hashes_path.exists():
+            await self._save_hashes(treehash)  # type: ignore # not the best solution but meh, cannot be unbound if that check is true
         return self._synced_commands
 
     @property
     def commands(self) -> list[TreeCommand]:
         """list[:class:`TreeCommand`]: Returns all global commands"""
         return [command for command in self.walk_commands()]
+
+    async def get_hash(self, *, guild: discord.abc.Snowflake | None = None) -> bytes:
+        commands = self._get_all_commands(guild=guild)
+        translator = self.translator
+
+        if translator:
+            payload = [await command.get_translated_payload(self, translator) for command in commands]
+        else:
+            payload = [command.to_dict(self) for command in commands]
+
+        return _hash_payload(payload)
 
     def get_guild_commands(
         self, guild: discord.abc.Snowflake = discord.utils.MISSING
@@ -289,8 +344,8 @@ class Tree(CommandTree):
             if not context.command:
                 cd = commands.Cooldown(error.cooldown.rate, error.cooldown.per)
             else:
-                cd = context.command.cooldown
-            new_err = commands.CommandOnCooldown(cd, error.retry_after, commands.BucketType.member)  # type: ignore
+                cd = context.command.cooldown or commands.Cooldown(error.cooldown.rate, error.cooldown.per)
+            new_err = commands.CommandOnCooldown(cd, error.retry_after, commands.BucketType.member)
         elif isinstance(error, discord.app_commands.CheckFailure):
             new_err = commands.CheckFailure(*error.args)
         elif isinstance(error, discord.app_commands.NoPrivateMessage):
@@ -394,6 +449,15 @@ class Bot(BotBase):
             )
         )
         self.guild_prefixes: dict[int, str] = {}
+        self.guild_locales: dict[int, discord.Locale] = {}
+
+        self.wavelink_nodes: list[wavelink.Node] = []
+        self.wavelink_pool = wavelink.Pool()
+        self._wavelink_ready = asyncio.Event()
+
+    def get_guild_locale(self, guild_id: int, /) -> discord.Locale:
+        """Returns a guild configurated locale, or :attr:`discord.Locale.spain_spanish`."""
+        return self.guild_locales.get(guild_id, discord.Locale.spain_spanish)
 
     def set_session(self, session: aiohttp.ClientSession) -> None:
         """Sets the new client session"""
@@ -422,6 +486,30 @@ class Bot(BotBase):
         translator = Translator()
         translator.session = self.session
         await self.tree.set_translator(translator)
+        await self.connect_wavelink_nodes()
+
+    def wavelink_is_ready(self) -> bool:
+        """:class:`bool`: Returns ``True`` if the wavelink Pool and nodes have been successfully
+        connected.
+        """
+        return self._wavelink_ready.is_set()
+
+    async def connect_wavelink_nodes(self) -> None:
+        node = wavelink.Node(
+            identifier=os.environ['LAVALINK_IDENTIFIER'],
+            password=os.environ['LAVALINK_PASSWORD'],
+            uri=f'https://{os.environ["LAVALINK_HOST"]}:{os.environ["LAVALINK_PORT"]}',
+            client=self,
+        )
+        self.wavelink_nodes.append(node)
+
+        done = False
+        async with asyncio.timeout(30):
+            await self.wavelink_pool.connect(nodes=self.wavelink_nodes)
+            done = True
+
+        if done:
+            self._wavelink_ready.set()
 
     async def _load_guild_prefixes(self) -> None:
         from models import Guild  # type: ignore
@@ -508,9 +596,9 @@ class Bot(BotBase):
         origin: discord.Message | discord.Interaction,
         /,
         *,
-        cls: type[commands.Context] = Context,
+        cls: type[commands.Context["Bot"]] = Context,
     ) -> Context["Bot"]:
-        return await super().get_context(origin, cls=cls)
+        return await super().get_context(origin, cls=cls)  # type: ignore
 
     async def on_message(self, message: discord.Message, /) -> None:
         if message.author.bot or message.author == self.user:
@@ -618,7 +706,7 @@ class Bot(BotBase):
                 f"❌ | `{error.argument}` no es un valor válido para ``True`` o ``False``.",
                 ephemeral=True,
             )
-        elif isinstance(error, commands.BadColorArgument):
+        elif isinstance(error, commands.BadColourArgument):
             await ctx.reply(
                 f"❌ | `{error.argument}` no es un valor válido de un color.",
                 ephemeral=True,
@@ -647,6 +735,76 @@ class Bot(BotBase):
             await ctx.reply(
                 f"❌ | Se ha alcanzado el límite de ejecuciones simultáneas de este comando ({error.number} uso(s) {self._get_bucket_name(error.per)}).",
                 ephemeral=True,
+            )
+        elif isinstance(error, commands.MessageNotFound):
+            await ctx.reply(
+                f':x: | El mensaje {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.MemberNotFound):
+            await ctx.reply(
+                f':x: | El miembro {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.GuildNotFound):
+            await ctx.reply(
+                f':x: | El servidor {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.UserNotFound):
+            await ctx.reply(
+                f':x: | El usuario {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.ChannelNotFound):
+            await ctx.reply(
+                f':x: | El canal {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.ChannelNotReadable):
+            await ctx.reply(
+                f':x: | ¡No puedo leer mensajes en el canal {error.argument.mention}!',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.EmojiNotFound):
+            await ctx.reply(
+                f':x: | El emoji {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.GuildStickerNotFound):
+            await ctx.reply(
+                f':x: | El sticker {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.ScheduledEventNotFound):
+            await ctx.reply(
+                f':x: | El evento {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.SoundboardSoundNotFound):
+            await ctx.reply(
+                f':x: | El sonido {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.PartialEmojiConversionFailure):
+            await ctx.reply(
+                f':x: | {error.argument} no se pudo convertir a un emoji.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.ThreadNotFound):
+            await ctx.reply(
+                f':x: | El hilo {error.argument} no se pudo encontrar.',
+                ephemeral=True,
+            )
+        elif isinstance(error, commands.RangeError):
+            m = ""
+            if isinstance(error.value, (int, float)):
+                m = f"{error.value} debe de estar entre {error.minimum or '-'} y {error.maximum or '-'}"
+            elif isinstance(error.value, str):
+                m = f"{error.value} debe de ser de largo entre {error.minimum or '-'} y {error.maximum or '-'}"
+
+            await ctx.reply(
+                f':x: | {m}'
             )
         elif isinstance(error, VouchFailure):
             await ctx.reply(

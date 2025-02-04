@@ -52,8 +52,8 @@ logger = logging.getLogger(__name__)
 
 
 class Prefix(commands.Converter):
-    async def convert(self, ctx: GuildContext, argument: str) -> str:
-        user_id = ctx.bot.user.id
+    async def convert(self, ctx: GuildContext, argument: str) -> str:  # type: ignore
+        user_id = ctx.bot.user.id  # type: ignore
 
         if argument.startswith((f"<@{user_id}>", f"<@!{user_id}>")):
             raise commands.BadArgument(
@@ -79,7 +79,7 @@ class GroupHelpPageSource(menus.ListPageSource):
         self.title: str = f"Comandos en `{self.group.qualified_name}`"
         self.description: str = self.group.description
 
-    async def format_page(
+    async def format_page(  # type: ignore
         self, menu: SpacePages, commands: list[commands.HybridCommand]
     ) -> discord.Embed:
         embed = discord.Embed(
@@ -174,7 +174,7 @@ class FrontPageSource(menus.PageSource):
         # This forces the buttons to appear even in the front page
         return True
 
-    def get_max_pages(self) -> Optional[int]:
+    def get_max_pages(self) -> Optional[int]:  # type: ignore
         # There's only one actual page in the front page
         # However we need at least 2 to show all the buttons
         return 2
@@ -184,7 +184,7 @@ class FrontPageSource(menus.PageSource):
         self.index = page_number
         return self
 
-    def format_page(self, menu: HelpMenu, page: Any):
+    def format_page(self, menu: HelpMenu, page: Any):  # type: ignore
         embed = discord.Embed(title="Ayuda del Bot", colour=discord.Colour(0xA8B9CD))
         embed.description = inspect.cleandoc(
             f"""
@@ -202,7 +202,7 @@ class FrontPageSource(menus.PageSource):
             inline=False,
         )
 
-        created_at = discord.utils.format_dt(menu.ctx.bot.user.created_at, "F")
+        created_at = discord.utils.format_dt(menu.ctx.bot.user.created_at, "F")  # type: ignore
         if self.index == 0:
             embed.add_field(
                 name="¿Quién eres?",
@@ -274,7 +274,7 @@ class HelpMenu(RoboPages):
 
 
 class PaginatedHelpCommand(commands.HelpCommand):
-    context: Context
+    context: Context  # type: ignore
     with_app_command: bool = True
 
     def __init__(self):
@@ -287,7 +287,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
             }
         )
 
-    async def on_help_command_error(self, ctx: Context, error: commands.CommandError):
+    async def on_help_command_error(self, ctx: Context, error: commands.CommandError):  # type: ignore
         if isinstance(error, commands.CommandInvokeError):
             # Ignore missing permission errors
             if (
@@ -298,7 +298,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
 
             await ctx.send(str(error.original))
 
-    def get_command_signature(self, command: commands.HybridCommand) -> str:
+    def get_command_signature(self, command: commands.HybridCommand) -> str:  # type: ignore
         parent = command.full_parent_name
         if len(command.aliases) > 0:
             aliases = "|".join(command.aliases)
@@ -317,8 +317,8 @@ class PaginatedHelpCommand(commands.HelpCommand):
             cog = command.cog
             return cog.qualified_name if cog else "\U0010ffff"
 
-        entries: list[commands.HybridCommand] = await self.filter_commands(
-            bot.commands, sort=True, key=key
+        entries: list[commands.HybridCommand] = await self.filter_commands(  # type: ignore
+            bot.commands, sort=True, key=key  # type: ignore
         )
 
         all_commands: dict[commands.Cog, list[commands.HybridCommand]] = {}
@@ -337,15 +337,13 @@ class PaginatedHelpCommand(commands.HelpCommand):
     async def send_cog_help(self, cog):
         entries = await self.filter_commands(cog.get_commands(), sort=True)
         menu = HelpMenu(
-            GroupHelpPageSource(cog, entries, prefix=self.context.clean_prefix),
+            GroupHelpPageSource(cog, entries, prefix=self.context.clean_prefix),  # type: ignore
             ctx=self.context,
         )
         await menu.start(content=None)
 
     @staticmethod
-    def get_usage_emojis(
-        command: commands.HybridCommand | commands.HybridGroup
-    ) -> str:
+    def get_usage_emojis(command: commands.HybridCommand | commands.HybridGroup) -> str:
         application_emoji = "<:application_command:1293248219266027591>"
         string = "<:prefixed_command:1293248180606996600>"
         if not isinstance(command, commands.HybridCommand):
@@ -354,9 +352,14 @@ class PaginatedHelpCommand(commands.HelpCommand):
                     return string
                 case discord.app_commands.Command:
                     return application_emoji
-                case (commands.help._HelpCommandImpl, commands.HelpCommand, commands.MinimalHelpCommand, commands.DefaultHelpCommand):
+                case (
+                    commands.help._HelpCommandImpl,
+                    commands.HelpCommand,
+                    commands.MinimalHelpCommand,
+                    commands.DefaultHelpCommand,
+                ):
                     return string + application_emoji
-        if not hasattr(command, 'with_app_command'):
+        if not hasattr(command, "with_app_command"):
             return string
         if command.with_app_command and command.app_command:
             string += application_emoji
@@ -367,13 +370,13 @@ class PaginatedHelpCommand(commands.HelpCommand):
         embed_like: discord.Embed,
         command: Union[commands.HybridCommand, commands.HybridGroup],
     ):
-        embed_like.title = self.get_command_signature(command)
+        embed_like.title = self.get_command_signature(command)  # type: ignore
         if command.description:
             embed_like.description = f"{command.description}\n\n{command.help}"
         else:
             embed_like.description = command.help or "Sin ayuda corta"
 
-    async def send_command_help(
+    async def send_command_help(  # type: ignore
         self, command: Union[commands.HybridCommand, commands.HybridGroup]
     ):
         # No pagination necessary for a single command.
@@ -381,7 +384,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         self.common_command_formatting(embed, command)
         await self.context.send(content=None, embed=embed)
 
-    async def send_group_help(self, group: commands.HybridGroup):
+    async def send_group_help(self, group: commands.HybridGroup):  # type: ignore
         subcommands = group.commands
         if len(subcommands) == 0:
             return await self.send_command_help(group)
@@ -390,8 +393,8 @@ class PaginatedHelpCommand(commands.HelpCommand):
         if len(entries) == 0:
             return await self.send_command_help(group)
 
-        source = GroupHelpPageSource(group, entries, prefix=self.context.clean_prefix)
-        self.common_command_formatting(source, group)
+        source = GroupHelpPageSource(group, entries, prefix=self.context.clean_prefix)  # type: ignore
+        self.common_command_formatting(source, group)  # type: ignore
         menu = HelpMenu(source, ctx=self.context)
         await menu.start(content=None)
 
@@ -422,12 +425,13 @@ class Meta(commands.Cog):
             None, self.blocking_get_from_html, html
         )
 
-    async def get_context(self, interaction: discord.Interaction) -> Context:
+    async def get_context(self, interaction: discord.Interaction[Bot]) -> Context:
         bot = self.bot
         command = interaction.command
         if command is None:
             raise ValueError("interaction does not have command data")
         data = interaction.data
+        assert data
         if interaction.message is None:
             synthetic = {
                 "id": interaction.id,
@@ -439,7 +443,7 @@ class Meta(commands.Cog):
                 "edited_timestamp": None,
                 "type": (
                     discord.MessageType.chat_input_command
-                    if data.get("type", 1) == 1
+                    if data.get("type", 1) == 1  # type: ignore
                     else discord.MessageType.context_menu_command
                 ),
                 "flags": 64,
@@ -458,7 +462,7 @@ class Meta(commands.Cog):
                 id=interaction.channel_id,
             )
             message = discord.Message(
-                state=interaction._state, channel=channel, data=synthetic
+                state=interaction._state, channel=channel, data=synthetic  # type: ignore
             )
             message.author = interaction.user
             message.attachments = [
@@ -476,7 +480,7 @@ class Meta(commands.Cog):
             prefix=prefix,
             interaction=interaction,
             invoked_with=command.name,
-            command=command,
+            command=command,  # type: ignore
         )
         interaction._baton = ctx
         ctx.command_failed = interaction.command_failed

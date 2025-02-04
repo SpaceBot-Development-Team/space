@@ -42,7 +42,7 @@ class Juegos(commands.Cog):
                 (payload.message_id == check_message.id)
                 and (payload.guild_id == ctx.guild.id)
                 and (payload.user_id == rival.id)
-                and (payload.member.id == rival.id)
+                and (payload.member.id == rival.id)  # type: ignore
                 and (str(payload.emoji) == "✅")
             )
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 from typing import TYPE_CHECKING, Any, Coroutine, Generator, Literal
 import discord
 import asyncio
@@ -15,10 +16,14 @@ from jishaku.paginators import PaginatorEmbedInterface
 from discord.ext.commands.cog import Cog
 from discord.ext import commands
 from _types import Context, Bot
+import tortoise
+import asyncpg
 
 
 if TYPE_CHECKING:
     from typing_extensions import Self
+
+    from tortoise.backends.asyncpg import AsyncpgDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +70,7 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
     def __init__(self, bot: Bot) -> None:
         self.bot: Bot = bot
 
-    def cog_check(self, ctx: Context) -> Coroutine[Any, Any, bool]:
+    def cog_check(self, ctx: Context) -> Coroutine[Any, Any, bool]:  # type: ignore
         return self.bot.is_owner(ctx.author)
 
     @commands.command(name="bot-servers", hidden=True)
@@ -140,6 +145,7 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
         "__import__({}",
         "from .{} import",
         "import .{}",
+        "importlib.import_module({}"
     )
 
     def _resolve_relative_import(self, path: str, rel_import: str) -> str:
@@ -185,25 +191,31 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
 
                         if found_import:
                             rel_path = os.path.relpath(file_path, search_path)
-                            mod_name_from_file = os.path.splitext(rel_path.replace(os.sep, "."))[0]
+                            mod_name_from_file = os.path.splitext(
+                                rel_path.replace(os.sep, ".")
+                            )[0]
                             if mod_name_from_file in sys.modules:
                                 logger.debug(
-                                    'Reloaded module %s for total reload of %s',
+                                    "Reloaded module %s for total reload of %s",
                                     mod_name_from_file,
                                     module_name,
                                 )
                                 importlib.reload(sys.modules[mod_name_from_file])
                 except Exception as exc:
                     logger.error(
-                        'Error occurred while reloading module %s for total reload of %s. Traceback:\n%s',
+                        "Error occurred while reloading module %s for total reload of %s. Traceback:\n%s",
                         file_path,
                         module_name,
                         traceback.format_exception(
-                            type(exc), exc, exc.__traceback__,
+                            type(exc),
+                            exc,
+                            exc.__traceback__,
                         ),
                     )
                     raise exc
-        logger.info('Successfully reloaded module %s and all files that import it', module_name)
+        logger.info(
+            "Successfully reloaded module %s and all files that import it", module_name
+        )
 
     @discord.utils.copy_doc(_reload_module_and_importers)
     async def reload_module_and_importers(
@@ -217,7 +229,9 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
     async def hotreload(self, ctx: Context, *, module: str) -> None:
         """Recarga un módulo, recargando de paso todos los archivos que lo importan."""
 
-        if module.startswith('cogs.') and module in self.bot.extensions.keys():  # Module is a cog, then
+        if (
+            module.startswith("cogs.") and module in self.bot.extensions.keys()
+        ):  # Module is a cog, then
             await self.bot.reload_extension(module)
         ret = await ctx.reply(f"Recargando módulo ``{module}``")
         try:
@@ -230,7 +244,48 @@ class Owner(Cog, command_attrs=dict(hidden=True)):
                 content=f"Un error ocurrió, [ve al mensaje de error]({err.jump_url})",
             )
         else:
-            await ret.edit(content="¡Recargado exitósamente!",)
+            await ret.edit(
+                content="¡Recargado exitósamente!",
+            )
+
+    def _read_migration_contents(self, file: pathlib.Path) -> str:
+        with open(file) as f:
+            return f.read()
+
+
+    async def apply_migration(self, version: int, /) -> None:
+        parent = pathlib.Path('database_updates')
+        children = list(parent.iterdir())
+        migration_path: pathlib.Path | None = None
+        for child in children:
+            if child.name.startswith(f'v{version}'):
+                migration_file = child
+                break
+
+        if migration_path is None:
+            raise RuntimeError(f'No existe una migración con ID de versión {version!r}')
+
+        query = await self.bot.loop.run_in_executor(None, self._read_migration_contents, migration_file)
+        connection: AsyncpgDBClient = tortoise.connections.get('default')
+
+        conn: asyncpg.Connection
+        async with connection.acquire_connection() as conn:
+            async with conn.transaction():
+                await conn.fetchrow(query)
+
+    @commands.command(name='migrate-db', hidden=True)
+    async def migrate_db(self, ctx: Context, *, version: int) -> None:
+        """Aplica una migración de la base de datos."""
+
+        ret = await ctx.reply('Aplicando migración...')
+
+        try:
+            await self.apply_migration(version)
+        except Exception as exc:
+            err = await ctx.safe_send(f'Un error ocurrió mientras se aplicaba la migración: {exc}')
+            await ret.edit(content=f'Un error ocurrió, [ve al mensaje de error]({err.jump_url})')
+        else:
+            await ret.edit(content=f'Se ha aplicado exitósamente la migración v{version!r}')
 
 
 async def setup(bot: Bot) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from typing import (
     Any,
     Iterable,
@@ -15,7 +16,7 @@ from typing import (
     Generic,
 )
 
-import discord, io
+import discord
 from discord.ext import commands
 
 from aiohttp import ClientSession
@@ -23,10 +24,12 @@ from aiohttp import ClientSession
 MISSING = discord.utils.MISSING
 
 if TYPE_CHECKING:
-    from .bot import Bot
     from models import SuggestionsConfig
+    from cogs.admin.commands.automod import ModConfig, Moderation
+    from _types.bot import Bot
 
 T = TypeVar("T")
+BotT = TypeVar("BotT", bound="commands.Bot")
 
 
 class ConfirmationView(discord.ui.View):
@@ -112,18 +115,21 @@ class DisambiguatorView(discord.ui.View, Generic[T]):
         self.stop()
 
 
-class _CTX(commands.Context[Any]):
-    author: discord.Member
-    guild: discord.Guild
-    channel: Union[discord.VoiceChannel, discord.TextChannel, discord.Thread]
-    me: discord.Member
+class _CTX(Generic[BotT], commands.Context[BotT]):
+    author: discord.Member  # type: ignore
+    guild: discord.Guild  # type: ignore
+    channel: Union[discord.VoiceChannel, discord.TextChannel, discord.Thread]  # type: ignore
+    me: discord.Member  # type: ignore
     prefix: str
-    bot: Bot
-    command: commands.Command
-    prefix: str
+    bot: BotT  # type: ignore
+    command: commands.Command  # type: ignore
+    prefix: str  # type: ignore
+
+    if TYPE_CHECKING:
+        bot: Bot  # type: ignore
 
 
-class Context(_CTX):
+class Context(Generic[BotT], _CTX[BotT]):
     async def entry_to_code(self, entries: Iterable[Tuple[str, str]]) -> None:
         width = max(len(a) for a, b in entries)
         output = ["```"]
@@ -287,9 +293,18 @@ class Context(_CTX):
             return discord.Locale.spain_spanish
         return self.interaction.locale
 
+    @property
+    async def owner_invokation(self) -> bool:
+        return await self.bot.is_owner(self.author)
+
 
 class GuildContext(Context): ...
 
 
 class SuggestionsContext(Context):
     config: SuggestionsConfig
+
+
+class ModGuildContext(GuildContext):
+    config: ModConfig
+    cog: Moderation

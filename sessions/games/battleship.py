@@ -149,7 +149,7 @@ class Button(discord.ui.Button["BoardView"]):
         self.disabled = self.cell.bomb_state is not None
         self.emoji = self.cell.display_emoji
 
-    async def callback(self, itx: discord.Interaction) -> None:
+    async def callback(self, itx: discord.Interaction) -> None:  # type: ignore
         assert self.view is not None, "Un error inesperado ha ocurrido"
         # assert keyword is the same as
         # if not []:
@@ -160,7 +160,7 @@ class Button(discord.ui.Button["BoardView"]):
         enemy_cell = enemy.board[self.y][self.x]
 
         self.cell.bomb_state = enemy_cell.ship
-        enemy_cell.enemy_sate = enemy_cell.ship
+        enemy_cell.enemy_state = enemy_cell.ship
 
         self.update()
 
@@ -187,7 +187,7 @@ class Button(discord.ui.Button["BoardView"]):
         content = f"Turno de {enemy.member.mention}"
         enemy_content = f"¡Tu ({enemy.member.mention}) turno!"
 
-        if enemy_cell.emoji is not None and enemy.is_ship_sunk(enemy_cell.emoji):
+        if enemy_cell.emoji is not None and enemy.is_ship_shrunk(enemy_cell.emoji):
             content = f"{content}\n\n¡Has hundido su {enemy_cell.emoji}!"
             enemy_content = f"{enemy_content}\n\nTu {enemy_cell.emoji} fue hundido :("
 
@@ -204,7 +204,7 @@ class Button(discord.ui.Button["BoardView"]):
 class BoardView(discord.ui.View):
     message: discord.InteractionMessage
     parent_message: discord.Message
-    children: list[Button]
+    children: list[Button]  # type: ignore
 
     def __init__(self, player: PlayerState, enemy: PlayerState) -> None:
         super().__init__(timeout=None)
@@ -216,7 +216,7 @@ class BoardView(discord.ui.View):
             for y in range(5):
                 self.add_item(Button(self.player.board[y][x], x, y))
 
-    async def interaction_check(self, itx: discord.Interaction) -> bool:
+    async def interaction_check(self, itx: discord.Interaction) -> bool:  # type: ignore
         if not self.enemy.ready:
             await itx.response.send_message(
                 "Tu enemigo no está list aún, por favor, espere a que se prepare.",
@@ -239,7 +239,7 @@ class BoardSetupButton(discord.ui.Button["BoardSetupView"]):
         self.x: int = x
         self.y: int = y
 
-    async def callback(self, itx: discord.Interaction) -> None:
+    async def callback(self, itx: discord.Interaction) -> None:  # type: ignore
         assert self.view is not None, "Un error inesperado ha ocurrido"
 
         try:
@@ -256,7 +256,7 @@ class BoardSetupButton(discord.ui.Button["BoardSetupView"]):
 
 
 class BoardSetupView(discord.ui.View):
-    children: list[BoardSetupButton]
+    children: list[BoardSetupButton]  # type: ignore
 
     def __init__(
         self, player: PlayerState, enemy: PlayerState, parent_button: ReadyButton
@@ -389,7 +389,7 @@ class BoardSetupView(discord.ui.View):
             self.taken_length.add(size)
             self.last_location = None
 
-    def is_done(self) -> None:
+    def is_done(self) -> bool:
         return len(self.placements) == 9
 
 
@@ -464,7 +464,7 @@ class ReadyButton(discord.ui.Button["Prompt"]):
 
 class Prompt(discord.ui.View):
     message: discord.Message
-    children: list[discord.ui.Button]
+    children: list[discord.ui.Button]  # type: ignore
 
     def __init__(self, first: discord.abc.User, second: discord.abc.User):
         super().__init__(timeout=300.0)

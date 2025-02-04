@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
-from jishaku.shim.paginator_200 import PaginatorEmbedInterface
+from jishaku.paginators import PaginatorEmbedInterface
 
 from _types import group
 from _types.commands import command

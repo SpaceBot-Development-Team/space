@@ -32,12 +32,24 @@ from _types import Bot
 import discord
 import aiohttp
 
+if '.env' in os.listdir('.'):
+    from dotenv import load_dotenv
+    load_dotenv()
+
 try:
     TOKEN = os.environ["TOKEN"]
     DB_URL = os.environ["DB_URL"]
     DB_PASSWORD = os.environ["DB_PASSWORD"]
     TGG_TOKEN = os.environ["TGG_TOKEN"]
     JEYY_TOKEN = os.environ["JEYY_TOKEN"]
+
+    for lavalink_key in (
+        'LAVALINK_IDENTIFIER',
+        'LAVALINK_PASSWORD',
+        'LAVALINK_HOST',
+        'LAVALINK_PORT',
+    ):
+        os.environ[lavalink_key]
 except KeyError as exc:
     raise RuntimeError(
         "Could not initialize bot because the environment was not set"
@@ -92,11 +104,12 @@ os.environ["JISHAKU_HIDE"] = "True"
 
 async def create_tables_for(guild: discord.Guild) -> None:
     from models import Guild, SuggestionsConfig, VouchsConfig, WarnsConfig
+
     tables = (Guild, SuggestionsConfig, VouchsConfig, WarnsConfig)
     for table in tables:
         if not await table.exists(id=guild.id):
             await table.create(id=guild.id)
-    bot.logger.info('Ensured all guild related configs for %s', guild.id)
+    bot.logger.info("Ensured all guild related configs for %s", guild.id)
 
 
 @bot.event
@@ -114,6 +127,7 @@ async def on_guild_join(guild: discord.Guild) -> None:
         if entry.user is not None:
             await entry.user.send(embed=bot.thanks_for_adding())
     await create_tables_for(guild)
+
 
 @bot.event
 async def on_guild_available(guild: discord.Guild):

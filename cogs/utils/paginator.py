@@ -162,11 +162,13 @@ class SpacePages(discord.ui.View):
     ) -> None:
         if interaction.response.is_done():
             await interaction.followup.send(
-                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}", ephemeral=True
+                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}",
+                ephemeral=True,
             )
         else:
             await interaction.response.send_message(
-                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}", ephemeral=True
+                f"Un error desconocido ha ocurrido, disculpas.\nInformación: {traceback.format_exception(type(error), error, error.__traceback__)}",
+                ephemeral=True,
             )
 
     async def start(
@@ -283,7 +285,7 @@ class FieldPageSource(menus.ListPageSource):
         self.clear_description: bool = clear_description
         self.inline: bool = inline
 
-    async def format_page(
+    async def format_page(  # type: ignore
         self, menu: SpacePages, entries: list[tuple[Any, Any]]
     ) -> discord.Embed:
         self.embed.clear_fields()
@@ -309,7 +311,7 @@ class TextPageSource(menus.ListPageSource):
 
         super().__init__(entries=pages.pages, per_page=1)
 
-    async def format_page(self, menu, content):
+    async def format_page(self, menu, content):  # type: ignore
         maximum = self.get_max_pages()
         if maximum > 1:
             return f"{content}\nPág. {menu.current_page + 1}/{maximum}"
@@ -317,7 +319,7 @@ class TextPageSource(menus.ListPageSource):
 
 
 class SimplePageSource(menus.ListPageSource):
-    async def format_page(self, menu, entries):
+    async def format_page(self, menu, entries):  # type: ignore
         pages = []
         for index, entry in enumerate(entries, start=menu.current_page * self.per_page):
             pages.append(f"{index + 1}. {entry}")
@@ -342,7 +344,7 @@ class SimplePages(SpacePages):
         self.embed = discord.Embed(colour=discord.Colour.blurple())
 
 
-from jishaku.shim.paginator_200 import PaginatorEmbedInterface
+from jishaku.paginators import PaginatorEmbedInterface
 
 
 ReferenceLike = Union[discord.Message, discord.PartialMessage, commands.Context]
@@ -380,7 +382,7 @@ class EmbedPaginator(PaginatorEmbedInterface):
         super().update_view()
         self.button_close.label = f"{self.emojis.close} \u200b Cerrar"
 
-    class PageChangeModal(discord.ui.Modal, title="Ir a la página"):
+    class PageChangeModal(discord.ui.Modal, title="Ir a la página"):  # type: ignore
         page_number: discord.ui.TextInput[discord.ui.Modal] = discord.ui.TextInput(
             label="Página",
             style=discord.TextStyle.short,
@@ -409,7 +411,7 @@ class EmbedPaginator(PaginatorEmbedInterface):
                 self.interface.update_view()
                 await itx.response.edit_message(**self.interface.send_kwargs)
 
-    async def send_to(self, reference: ReferenceLike) -> EmbedPaginator:
+    async def send_to(self, reference: ReferenceLike) -> EmbedPaginator:  # type: ignore
         """Replies to the reference."""
 
         self.message: discord.Message = await reference.reply(

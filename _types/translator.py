@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import aiohttp
 import discord
@@ -38,6 +38,11 @@ except ImportError:
 
 if TYPE_CHECKING:
     from discord_tools.app_commands.i18n.translator import TranslationLoadStrategy
+
+__slots__ = (
+    'Translator',
+    'locale_bool',
+)
 
 
 class Translator(i18n.Translator):
@@ -72,3 +77,11 @@ class Translator(i18n.Translator):
         key = location.name
         sub = data.get(key, {})
         return sub.get(str(string))
+
+DEFAULT_LOOKUP = {
+    True: 'Sí',
+    False: 'No',
+}
+
+def locale_boolean(v: bool, *, lookup: dict[Literal[True, False], str] = DEFAULT_LOOKUP) -> str:
+    return lookup.get(v, str(v))
