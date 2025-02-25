@@ -306,7 +306,7 @@ class JoinGiveaway(discord.ui.DynamicItem[discord.ui.Button], template=r'join_gi
                 ephemeral=True,
             )
 
-PartialMessage = Annotated[discord.PartialMessage, commands.PartialMessageConverter]
+PartialMessage = Annotated[discord.PartialMessage | None, commands.PartialMessageConverter]
 
 
 class Giveaways(commands.Cog):

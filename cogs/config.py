@@ -29,12 +29,43 @@ from typing import TYPE_CHECKING, Any
 
 import asyncpg
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 if TYPE_CHECKING:
+    from typing import TypedDict
+
     from bot import LegacyBot, LegacyBotContext as Context
 
+    class GreetData(TypedDict):
+        message: str
+        delafter: float
+
+    class ConfigRecord(TypedDict):
+        id: int
+        prefixes: list[str]
+        greets: dict[str, GreetData]
+
 DURATION_REGEX = re.compile(r'(\d{1,5}(?:[.,]?\d{1,5})?)([smhd])')
+
+
+def replace_greet_message_vars(string: str, member: discord.Member) -> str:
+    return string.replace(
+        "{mention}",
+        member.mention,
+    ).replace(
+        "{mc}",
+        str(
+            member.guild.member_count
+            or member.guild.approximate_member_count
+            or len(member.guild.members)
+        ),
+    ).replace(
+        '{server_name}', member.guild.name,
+    ).replace(
+        '{member(tag)}', member.name,
+    ).replace(
+        '{member(name)}', member.display_name,
+    )
 
 
 class AddPrefixModal(discord.ui.Modal, title='Add A Prefix'):
@@ -61,7 +92,7 @@ class ConfigView(discord.ui.View):
     )
 
     def __init__(self, record: asyncpg.Record, *, premium: bool, author: discord.abc.Snowflake) -> None:
-        self.record: dict[str, Any] = dict(record)
+        self.record: ConfigRecord = dict(record)  # pyright: ignore[reportAttributeAccessIssue]
         self.author: discord.abc.Snowflake = author
         self.message: discord.Message | None = None
 
@@ -79,6 +110,27 @@ class ConfigView(discord.ui.View):
             self.add_prefix.disabled = True
         elif len(prefixes) >= 5 and premium:
             self.add_prefix.disabled = True
+
+        if premium:
+            self.greet_channels.max_values = 10
+        else:
+            self.greet_channels.max_values = 5
+
+        greet_channels = self.record['greets']
+        self.default_greet_value: GreetData = {
+            'delafter': 5.0,
+            'message': 'Welcome {mention} to {server_name}!'
+        }
+
+        if greet_channels:
+            defaults = [
+                discord.SelectDefaultValue.from_channel(
+                    discord.Object(int(ch))
+                ) for ch in greet_channels
+            ]
+            self.greet_channels.default_values = defaults
+
+            self.default_greet_value = tuple(greet_channels.values())[0]
 
     async def interaction_check(self, interaction: discord.Interaction[LegacyBot]) -> bool:
         if interaction.user.id != self.author.id:
@@ -101,6 +153,23 @@ class ConfigView(discord.ui.View):
         embed.add_field(
             name='Prefixes:',
             value=', '.join(f'`{pre}`' for pre in self.record['prefixes']),
+            inline=False,
+        )
+        embed.add_field(
+            name='Greet Channels',
+            value=', '.join(f'<#{ch}>' for ch in self.record['greets'].keys()),
+            inline=False,
+        )
+        embed.add_field(
+            name='Greet Message',
+            value=self.default_greet_value['message'],
+            inline=True,
+        )
+        delafter = self.default_greet_value['delafter']
+        embed.add_field(
+            name='Greet Delete After',
+            value=f'{delafter:.2f} seconds' if delafter > 0 else 'Deactivated',
+            inline=True,
         )
         return embed
 
@@ -168,10 +237,12 @@ class ConfigView(discord.ui.View):
 
     @discord.ui.button(
         label='Save',
-        row=1,
+        row=3,
         style=discord.ButtonStyle.green,
     )
     async def save_config(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ConfigView]) -> None:
+        assert interaction.guild_id
+
         if len(self.record["prefixes"]) == 0:
             await interaction.response.send_message(
                 'You need at least 1 prefix to save this configuration!',
@@ -183,9 +254,12 @@ class ConfigView(discord.ui.View):
         async with interaction.client.get_connection() as conn:
             async with conn.transaction():
                 await conn.execute(
-                    'UPDATE guilds SET prefixes=$1::varchar[] WHERE id=$2;',
-                    self.record["prefixes"], self.record["id"],
+                    'UPDATE guilds SET prefixes=$1::varchar[], greets=$2::jsonb WHERE id=$3;',
+                    self.record["prefixes"], self.record["greets"], self.record["id"],
                 )
+
+        interaction.client._guild_prefixes[interaction.guild_id] = self.record['prefixes']
+
         await interaction.followup.send(
             'Config successfully saved!',
             ephemeral=True,
@@ -193,7 +267,7 @@ class ConfigView(discord.ui.View):
 
     @discord.ui.button(
         label='Close',
-        row=1,
+        row=3,
         style=discord.ButtonStyle.red,
     )
     async def close_panel(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ConfigView]) -> None:
@@ -207,12 +281,131 @@ class ConfigView(discord.ui.View):
         cog.config_panels.pop(interaction.guild_id, None)
         self.stop()
 
+    @discord.ui.select(
+        cls=discord.ui.ChannelSelect,
+        channel_types=[
+            discord.ChannelType.text,
+            discord.ChannelType.news,
+            discord.ChannelType.news_thread,
+            discord.ChannelType.public_thread,
+            discord.ChannelType.private_thread,
+            discord.ChannelType.private,
+            discord.ChannelType.voice,
+        ],
+        row=1,
+    )
+    async def greet_channels(self, interaction: discord.Interaction[LegacyBot], select: discord.ui.ChannelSelect[ConfigView]) -> None:
+        default = self.default_greet_value
+
+        data = {}
+        defaults = []
+
+        for channel in select.values:
+            data[str(channel.id)] = default
+            defaults.append(discord.SelectDefaultValue.from_channel(channel))
+
+        self.record['greets'].update(data)
+        select.default_values = defaults
+        await interaction.response.edit_message(
+            embed=self.get_embed(),
+            view=self,
+        )
+
+    @discord.ui.button(
+        label='Edit Greet Message',
+        style=discord.ButtonStyle.blurple,
+        row=2,
+    )
+    async def greet_message(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ConfigView]) -> None:
+        modal = EditGreetMessage(self.default_greet_value['message'])
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+
+        self.default_greet_value['message'] = modal.message.value
+        channels = {}
+
+        for key, value in self.record['greets'].items():
+            channels[key] = value.update(self.default_greet_value)
+
+        self.record['greets'] = channels
+
+        await interaction.edit_original_response(
+            embed=self.get_embed(),
+            view=self,
+        )
+
+    @discord.ui.button(
+        label='Change Greet Delete After',
+        style=discord.ButtonStyle.blurple,
+        row=2,
+    )
+    async def greet_delafter(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ConfigView]) -> None:
+        await interaction.response.defer()
+        await interaction.followup.send(
+            'Send how much seconds should the greet message be available for.',
+            ephemeral=True,
+            wait=True,
+        )
+
+        try:
+            msg = await interaction.client.wait_for(
+                'message',
+                check=lambda m: m.author.id == interaction.user.id and m.channel.id == interaction.channel.id,
+                timeout=60.0,
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                content='You took too long to send a response! Aborting...',
+                ephemeral=True,
+            )
+            return
+
+        await msg.delete()
+
+        if not msg.content.isdigit():
+            await interaction.followup.send(
+                'Not a valid number provided!',
+                ephemeral=True,
+            )
+            return
+
+        self.default_greet_value['delafter'] = int(msg.content)
+
+        channels = {}
+        for key, value in self.record['greets'].items():
+            channels[key] = value.update(self.default_greet_value)
+
+        self.record['greets'] = channels
+
+        await interaction.edit_original_response(
+            embed=self.get_embed(),
+            view=self,
+        )
+
     async def start(self, ctx: Context) -> 'ConfigView':
         self.message = await ctx.reply(
             embed=self.get_embed(),
             view=self,
         )
         return self
+
+
+class EditGreetMessage(discord.ui.Modal, title='Edit Greet Message'):
+    message = discord.ui.TextInput(
+        label='Greet Message',
+        style=discord.TextStyle.short,
+        required=True,
+    )
+
+    def __init__(self, default: str | None = None) -> None:
+        super().__init__()
+
+        self.message.default = default
+
+    async def on_submit(self, interaction: discord.Interaction[LegacyBot]) -> None:
+        self.interaction = interaction
+        await interaction.response.defer()
+        self.stop()
 
 
 class EditWinMessage(discord.ui.Modal, title='Edit Win Message'):
@@ -536,12 +729,29 @@ class Configuration(commands.Cog):
 
         self.config_panels: dict[int, ConfigView] = {}
         self.gconfig_panels: dict[int, GConfigView] = {}
+        self.greets_cache: dict[int, dict[str, GreetData]] = {}
+
+        self.load_and_cache_configs.start()
 
     async def cog_unload(self) -> None:
         for panel in self.config_panels.values():
             await panel.on_timeout()
             panel.stop()
         self.config_panels.clear()
+
+        for panel in self.gconfig_panels.values():
+            await panel.on_timeout()
+            panel.stop()
+        self.gconfig_panels.clear()
+
+        self.load_and_cache_configs.cancel()
+        self.greets_cache.clear()
+
+    async def get_guilds_config(self) -> list[asyncpg.Record]:
+        rows = await self.bot.pool.fetch(
+            'SELECT * FROM guilds;',
+        )
+        return rows
 
     async def get_guild_config(self, guild: discord.Guild) -> asyncpg.Record | None:
         row = await self.bot.pool.fetchrow(
@@ -560,6 +770,37 @@ class Configuration(commands.Cog):
         if row is None:
             raise RuntimeError('row returned none')
         return row
+
+    @tasks.loop(seconds=30)
+    async def load_and_cache_configs(self) -> None:
+        rows = await self.get_guilds_config()
+
+        for row in rows:
+            self.greets_cache[int(row['id'])] = row['greets']
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member: discord.Member) -> None:
+        guild_id = member.guild.id
+        greet = self.greets_cache.get(guild_id)
+
+        if greet is None:
+            return
+
+        for ch, data in greet.items():
+            partial = self.bot.get_partial_messageable(
+                int(ch),
+                guild_id=member.guild.id,
+            )
+            msg = data['message']
+            delafter = data['delafter']
+
+            try:
+                await partial.send(
+                    replace_greet_message_vars(msg, member),
+                    delete_after=delafter,
+                )
+            except discord.HTTPException:
+                pass
 
     @commands.hybrid_command(name="config")
     @commands.has_guild_permissions(manage_guild=True)

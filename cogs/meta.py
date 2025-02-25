@@ -435,6 +435,22 @@ class ShowVarsView(discord.ui.View):
         )
         return embed
 
+    def get_greet_message_variables_embed(self, server_name: str) -> discord.Embed:
+        embed = discord.Embed(
+            title='Greet Message Variables',
+            description='These variables can be used to format your greet message and spice it up!',
+            colour=discord.Colour.blurple(),
+        )
+        embed.add_field(
+            name='\u200b',
+            value='- `{mention}` - The member mention (e.g.: ' f'{self.author.mention})\n'
+            '- `{mc}` - The server member count (e.g.: 1)\n'
+            '- `{server(name)}` - The server name (e.g.: ' f'{server_name})\n'
+            '- `{member(tag)}` - The member username (e.g: ' f'{self.author.name})\n'
+            '- `{member(name)}` - The member name (e.g.: ' f'{self.author.display_name})',
+        )
+        return embed
+
     @discord.ui.button(label='Win Message Variables', style=discord.ButtonStyle.blurple)
     async def win_message_variables(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]) -> None:
         self.enable_all()
@@ -448,6 +464,20 @@ class ShowVarsView(discord.ui.View):
         button.disabled = True
         button.style = discord.ButtonStyle.grey
         await interaction.response.edit_message(embed=self.get_gw_embed_variables_embed(), view=self)
+
+    @discord.ui.button(
+        label='Greet Message Variables',
+        style=discord.ButtonStyle.blurple,
+    )
+    async def greet_msg_vars(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]) -> None:
+        assert interaction.guild
+        self.enable_all()
+        button.disabled = True
+        button.style = discord.ButtonStyle.grey
+        await interaction.response.edit_message(
+            embed=self.get_greet_message_variables_embed(interaction.guild.name),
+            view=self,
+        )
 
     async def start(self, ctx: Context) -> None:
         self.win_message_variables.disabled = True

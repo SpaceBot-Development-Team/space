@@ -129,7 +129,7 @@ class Paginator(discord.ui.View):
                 if self.message:
                     await self.message.edit(**kwargs, view=self)
             else:
-                await interaction.response.send_message(**kwargs, view=self)
+                await interaction.response.edit_message(**kwargs, view=self)
 
     def _update_labels(self, page_number: int) -> None:
         self.go_to_first_page.disabled = page_number == 0
