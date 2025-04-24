@@ -41,6 +41,7 @@ if __name__ == "__main__":
         "cogs.giveaways",
         "cogs.meta",
         "cogs.config",
+        "cogs.tools",
         "jishaku",
     ]
 

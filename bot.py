@@ -23,9 +23,9 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
+import datetime
 import logging
 import asyncio
-from math import e
 from typing import Any, Final
 from collections.abc import Iterable
 
@@ -48,6 +48,7 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
 
     guild: discord.Guild
     author: discord.Member
+    channel: discord.TextChannel | discord.VoiceChannel | discord.StageChannel | discord.ForumChannel
 
     @property
     def reference(self) -> discord.MessageReference | None:
@@ -59,6 +60,17 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
         """:class:`discord.Message`: The resolved reference message, or ``None``."""
         return self.reference and (self.reference.resolved or self.reference.cached_message)  # pyright: ignore[reportReturnType]
 
+    @property
+    def created_at(self) -> datetime.datetime:
+        """:class:`datetime.datetime`: The time when this context was created at."""
+        if self.interaction:
+            return self.interaction.created_at
+        return self.message.created_at
+
+    @property
+    def not_found_enabled(self) -> bool:
+        return False
+
     async def buy_premium(self, content: str | None = None, **kwargs: Any) -> discord.Message:
         view = discord.ui.View(timeout=0.1)  # prevent storing it as it does not contain any handable button
         view.add_item(
@@ -68,6 +80,10 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
         )
         kwargs['view'] = view
         return await self.send(content, **kwargs)
+
+    async def reply_buy_premium(self, content: str | None = None, **kwargs: Any) -> discord.Message:
+        kwargs['reference'] = self.to_reference()
+        return await self.buy_premium(content, **kwargs)
 
     def get_connection(self):
         """:class:`PoolAcquireContext`: A shortcut for :meth:`LegacyBotContext.bot.get_connection <LegacyBot.get_connection>`."""
@@ -79,12 +95,51 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
             return self._cs_premium
 
         if self.interaction:
-            prem = PREMIUM_SKU_ID in [e.sku_id for e in self.interaction.entitlements]
+            prem = (
+                (PREMIUM_SKU_ID in [e.sku_id for e in self.interaction.entitlements])
+                or
+                (PREMIUM_SKU_ID in self.interaction.entitlement_sku_ids)
+            )
         else:
-            prem = len([_ async for _ in self.bot.entitlements(guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)])]) > 0
+            prem = len([_ async for _ in self.bot.entitlements(user=self.author, guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)])]) > 0
 
         self._cs_premium = prem
         return self._cs_premium
+
+    def to_reference(
+        self,
+        *,
+        fail_if_not_exists: bool = False,
+        type: discord.MessageReferenceType = discord.MessageReferenceType.reply,
+    ) -> discord.MessageReference:
+        """Creates a :class:`discord.MessageReference` from the current message.
+
+        Parameters
+        ----------
+        fail_if_not_exists: :class:`bool`
+            Whether the referenced message should raise :class:`discord.HTTPException`
+            if the message no longer exists or Discord could not fetch the message.
+        type: :class:`discord.MessageReferenceType`
+            The type of message reference.
+
+        Returns
+        ---------
+        :class:`discord.MessageReference`
+            The reference to this message.
+        """
+        return self.message.to_reference(
+            fail_if_not_exists=fail_if_not_exists,
+            type=type,
+        )
+
+    @property
+    def id(self) -> int:
+        """:class:`int`: Returns this context ID."""
+        return self.message.id
+
+    def to_message_reference_dict(self):
+        return self.message.to_message_reference_dict()
+
 
 def get_guild_prefix(bot: LegacyBot, message: discord.Message) -> list[str]:
     if message.guild is None:
@@ -286,6 +341,134 @@ class LegacyBot(commands.Bot):
                 )
         # ensure context manager closure
         pass
+
+        if self.application and self.application.team and self.application.team.owner:
+            channel = await self.create_dm(self.application.team.owner)
+            await channel.send(
+                content=f'New guild joined: {guild.name}',
+            )
+
+    async def on_command_error(self, context: LegacyBotContext, error: commands.CommandError) -> None:
+        embed = discord.Embed(
+            title='An error occurred!',
+            colour=discord.Colour.dark_red(),
+        )
+        if isinstance(error, commands.CommandOnCooldown):
+            reset = context.created_at + datetime.timedelta(seconds=error.retry_after)
+            embed.description = f'You are on cooldown! Try again {discord.utils.format_dt(reset, style="R")}'
+        elif isinstance(error, commands.MissingRequiredFlag):
+            embed.description = f'You missed a required flag "{error.flag.name}": {error.flag.description}'
+        elif isinstance(error, commands.TooManyFlags):
+            embed.description = f'Too many values provided to "{error.flag.name}"! It takes {error.flag.max_args} values and you provided {len(error.values)}!'
+        elif isinstance(error, commands.MissingFlagArgument):
+            embed.description = f'You did not provide a value for flag "{error.flag.name}"!'
+        elif isinstance(error, commands.BadFlagArgument):
+            embed.description = f'"{error.argument}" is not a valid value for flag "{error.flag.name}"!'
+        elif isinstance(error, commands.NSFWChannelRequired):
+            embed.description = 'This command can only be used on NSFW channels!'
+        elif isinstance(error, commands.BotMissingAnyRole):
+            fmt = [f'<@&{role}>' if isinstance(role, int) else role for role in error.missing_roles]
+            embed.description = f'I need {discord.utils._human_join(fmt)} roles to execute this command!'
+        elif isinstance(error, commands.MissingAnyRole):
+            fmt = [f'<@&{role}>' if isinstance(role, int) else role for role in error.missing_roles]
+            embed.description = f'You need {discord.utils._human_join(fmt)} roles to execute this command!'
+        elif isinstance(error, commands.BotMissingRole):
+            r = error.missing_role if isinstance(error.missing_role, str) else f'<@&{error.missing_role}>'
+            embed.description = f'I need the {r} role to execute this command!'
+        elif isinstance(error, commands.MissingRole):
+            r = error.missing_role if isinstance(error.missing_role, str) else f'<@&{error.missing_role}>'
+            embed.description = f'You need the {r} role to execute this command!'
+        elif isinstance(error, commands.BotMissingPermissions):
+            fmt = discord.utils._human_join(error.missing_permissions, final='and')
+            embed.description = f'I need {fmt} permissions to execute this command!'
+        elif isinstance(error, commands.MissingPermissions):
+            fmt = discord.utils._human_join(error.missing_permissions, final='and')
+            embed.description = f'You need {fmt} permissions to execute this command!'
+        elif isinstance(error, commands.RangeError):
+            fmt = []
+            is_string = isinstance(error.value, str)
+            if error.maximum is not None:
+                if is_string:
+                    fmt.append(f'be up to {error.maximum} long')
+                else:
+                    fmt.append(f'be less than {error.maximum}')
+            if error.minimum is not None:
+                if is_string:
+                    fmt.append(f'be at least {error.minimum} long')
+                else:
+                    fmt.append(f'be greater than {error.minimum}')
+            embed.description = f'The value "{error.value}" must {discord.utils._human_join(fmt, final="and")}'
+        elif isinstance(error, commands.BadBoolArgument):
+            embed.description = f'"{error.argument}" is not a valid boolean!'
+        elif isinstance(error, commands.SoundboardSoundNotFound):
+            embed.description = f'Soundboard sound with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.ScheduledEventNotFound):
+            embed.description = f'Scheduled event with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.GuildStickerNotFound):
+            embed.description = f'Sticker with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.PartialEmojiConversionFailure):
+            embed.description = f'"{error.argument}" could not be converted to a valid emoji!'
+        elif isinstance(error, commands.EmojiNotFound):
+            embed.description = f'Emoji with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.BadInviteArgument):
+            embed.description = f'Invite "{error.argument}" was not found or was expired!'
+        elif isinstance(error, commands.RoleNotFound):
+            embed.description = f'Role with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.BadColourArgument):
+            embed.description = f'Could not convert "{error.argument}" to a valid colour!'
+        elif isinstance(error, commands.ThreadNotFound):
+            embed.description = f'Thread with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.ChannelNotReadable):
+            embed.description = f'I do not have Read Messages permissions on {error.argument.mention}, and I need it to execute the command!'
+        elif isinstance(error, commands.ChannelNotFound):
+            embed.description = f'Channel with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.UserNotFound):
+            embed.description = f'User with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.GuildNotFound):
+            embed.description = f'Guild with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.MemberNotFound):
+            embed.description = f'Member with name or ID "{error.argument}" was not found!'
+        elif isinstance(error, commands.MessageNotFound):
+            embed.description = f'Message with ID or url "{error.argument}" was not found!'
+        elif isinstance(error, commands.NotOwner):
+            return  # it is owner only then why even bother to tell them, if it was hidden then we should not provide a response
+        elif isinstance(error, commands.MaxConcurrencyReached):
+            bucket = error.per.name
+            if bucket == 'default':
+                embed.description = f'This command can only be used {error.number} times concurrently globally!'
+            else:
+                embed.description = f'This command can only be used {error.number} times concurrently per {bucket}'
+        elif isinstance(error, commands.TooManyArguments):
+            embed.description = 'Too many arguments provided to the command!'
+        elif isinstance(error, commands.DisabledCommand):
+            embed.description = 'This command is disabled!'
+        elif isinstance(error, commands.CommandNotFound):
+            if context.not_found_enabled:
+                embed.description = f'Command "{context.invoked_with}" not found!'
+            else:
+                return
+        elif isinstance(error, commands.NoPrivateMessage):
+            embed.description = 'This command can only be used on servers!'
+        elif isinstance(error, commands.PrivateMessageOnly):
+            embed.description = 'This command can only be used on private messages!'
+        elif isinstance(error, commands.BadLiteralArgument):
+            embed.description = f'"{error.argument}" is not a valid choice available in {discord.utils._human_join(error.literals)}'
+        elif isinstance(error, commands.BadUnionArgument):
+            embed.description = f'"{error.param.name}" value was not valid!'
+        elif isinstance(error, commands.ExpectedClosingQuoteError):
+            embed.description = f'A value\'s quote was not closed, expected `{error.close_quote}`'
+        elif isinstance(error, commands.InvalidEndOfQuotedStringError):
+            embed.description = f'A space was expected after quote closure on a value, but got `{error.char}` instead'
+        elif isinstance(error, commands.UnexpectedQuoteError):
+            embed.description = f'Found a quote in a non-quoted value: `{error.quote}`'
+        elif isinstance(error, commands.MissingRequiredAttachment):
+            embed.description = 'You are missing one attachment to execute this command!'
+        elif isinstance(error, commands.MissingRequiredArgument):
+            assert context.command
+            embed.description = f'`{error.param.name}` is missing! Make sure you follow the command syntax: `{context.command.signature}`'
+        else:
+            embed.description = f'An unknown exception has occurred: {error}'
+        await context.reply(embed=embed)
 
     async def on_ready(self) -> None:
         if not self.user:
