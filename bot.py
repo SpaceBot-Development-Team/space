@@ -558,10 +558,11 @@ class LegacyBot(commands.Bot):
         else:
             log.info(f'Logged in as {self.user}')
 
-        await self.send_debug_message(
-            embed=discord.Embed(
-                title='\N{INFORMATION SOURCE} Bot ready!',
-                description='You can now set up the git repository using ``jsk sh``',
-                colour=discord.Colour.blue(),
-            ),
-        )
+        if not getattr(self, 'NODEBUGREADY', False):
+            await self.send_debug_message(
+                embed=discord.Embed(
+                    title='\N{INFORMATION SOURCE} Bot ready!',
+                    description='You can now set up the git repository using ``jsk sh``',
+                    colour=discord.Colour.blue(),
+                ),
+            )

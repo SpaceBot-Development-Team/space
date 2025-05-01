@@ -95,6 +95,7 @@ if __name__ == "__main__":
                     bot.activity = discord.Game('?help')
                 else:
                     bot.command_prefix = '-'
+                    bot.NODEBUGREADY = True  # type: ignore
 
                 bot.pool = pool
 
