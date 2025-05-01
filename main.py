@@ -26,6 +26,7 @@ if __name__ == "__main__":
     import asyncio
     import os
     import json
+    import sys
 
     import discord
     import asyncpg
@@ -44,6 +45,8 @@ if __name__ == "__main__":
         "cogs.tools",
         "jishaku",
     ]
+
+    DEBUG_MODE: bool = sys.argv[-1] == '--debug'
 
     load_dotenv()
 
@@ -87,8 +90,12 @@ if __name__ == "__main__":
                 max_size=20,
                 min_size=20,
             ) as pool:
-                bot.status = discord.Status.idle
-                # bot.activity = discord.CustomActivity("Testing")
+                if not DEBUG_MODE:
+                    bot.status = discord.Status.idle
+                    bot.activity = discord.Game('?help')
+                else:
+                    bot.command_prefix = '-'
+
                 bot.pool = pool
 
                 discord.utils.setup_logging()

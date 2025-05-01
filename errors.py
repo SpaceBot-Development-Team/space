@@ -61,3 +61,8 @@ class NoGiveawayPrivileges(commands.CheckFailure):
 
     def __init__(self) -> None:
         super().__init__()
+
+
+class ModuleDisabled(commands.CommandError):
+    def __init__(self, module: str) -> None:
+        super().__init__(f'Module `{module}` is disabled!')

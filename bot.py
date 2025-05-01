@@ -37,6 +37,7 @@ from discord.ext import commands
 import asyncpg
 
 from store.claimtime import ClaimtimeDBStore
+from errors import ModuleDisabled
 
 MISSING: Any = discord.utils.MISSING
 PREMIUM_SKU_ID: Final[int] = 1256218013930094682
@@ -182,7 +183,19 @@ class LegacyBot(commands.Bot):
         self._guild_prefixes: dict[int, list[str]] = {}
         self._prefix_creation_tasks: set[asyncio.Task] = set()
         self.claimtime_store: ClaimtimeDBStore = ClaimtimeDBStore(self)
+        self._disabled_modules: dict[int, list[str]] = {}
         self.__wh_url: str | None = debug_webhook_url
+
+        self.add_check(self.module_enabled)
+
+    async def module_enabled(self, context: LegacyBotContext) -> bool:
+        if not context.command:
+            return True
+        if not context.cog:
+            return True
+        if context.cog.qualified_name in self._disabled_modules.get(context.guild.id, []):
+            raise ModuleDisabled(context.cog.qualified_name)
+        return True
 
     def get_connection(self):
         """:class:`asyncpg.Connection`: Returns a pool connection to the database."""
@@ -219,6 +232,25 @@ class LegacyBot(commands.Bot):
             The guild prefixes, or ``None`` if not yet loaded.
         """
         return self._guild_prefixes.get(guild_id)
+
+    async def load_disabled_modules(self) -> None:
+        async with self.get_connection() as conn:
+            rows = await conn.fetch(
+                'SELECT ("id", disabled_modules::text[]) FROM guilds;',
+            )
+
+        for row in rows:
+            self._disabled_modules[int(row['id'])] = row['disabled_modules']
+
+    async def update_disabled_modules(self, guild_id: int, disabled_modules: list[str]) -> None:
+        async with self.get_connection() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    'UPDATE guilds SET disabled_modules = $1::text[] WHERE "id" = $2;',
+                    disabled_modules, guild_id,
+                )
+
+        self._disabled_modules[guild_id] = disabled_modules
 
     def schedule_prefix_creation(self, guild_id: int, /) -> None:
         task = asyncio.create_task(self._create_or_cache_guild_config(guild_id), name=f'Create-or-cache-guild-{guild_id}')
@@ -271,6 +303,7 @@ class LegacyBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         await self.load_guild_prefixes()
+        await self.load_disabled_modules()
         await self.claimtime_store.load()
         await self.load_initial_extensions()
 
@@ -498,6 +531,8 @@ class LegacyBot(commands.Bot):
         elif isinstance(error, commands.MissingRequiredArgument):
             assert context.command
             embed.description = f'`{error.param.name}` is missing! Make sure you follow the command syntax: `{context.command.signature}`'
+        elif isinstance(error, ModuleDisabled):
+            embed.description = str(error)
         else:
             embed.description = f'An unknown exception has occurred: {error}'
             error = getattr(error, '__original__', error)
