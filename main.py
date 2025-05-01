@@ -87,8 +87,8 @@ if __name__ == "__main__":
                 max_size=20,
                 min_size=20,
             ) as pool:
-                bot.status = discord.Status.dnd
-                bot.activity = discord.CustomActivity("Testing")
+                bot.status = discord.Status.idle
+                # bot.activity = discord.CustomActivity("Testing")
                 bot.pool = pool
 
                 discord.utils.setup_logging()
