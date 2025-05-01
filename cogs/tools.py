@@ -127,7 +127,7 @@ class TimeDiffView(discord.ui.LayoutView):
         await self.message.edit(view=self)
 
     def update_container(self, *, disable_buttons: bool = False) -> None:
-        self.object_container.clear_items()
+        self.object_container._children = []
 
         diff = self.object_2.created_at - self.object_1.created_at
 

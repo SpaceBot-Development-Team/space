@@ -26,6 +26,7 @@ from __future__ import annotations
 import datetime
 import logging
 import asyncio
+import traceback
 from typing import Any, Final
 from collections.abc import Iterable
 
@@ -161,6 +162,7 @@ class LegacyBot(commands.Bot):
         allowed_installs: app_commands.AppInstallationType = MISSING,
         intents: discord.Intents,
         initial_extensions: Iterable[str],
+        debug_webhook_url: str | None = None,
         **options: Any,
     ) -> None:
         super().__init__(
@@ -180,10 +182,28 @@ class LegacyBot(commands.Bot):
         self._guild_prefixes: dict[int, list[str]] = {}
         self._prefix_creation_tasks: set[asyncio.Task] = set()
         self.claimtime_store: ClaimtimeDBStore = ClaimtimeDBStore(self)
+        self.__wh_url: str | None = debug_webhook_url
 
     def get_connection(self):
         """:class:`asyncpg.Connection`: Returns a pool connection to the database."""
         return self.pool.acquire()
+
+    @discord.utils.cached_property
+    def debug_webhook(self) -> discord.Webhook | None:
+        """Optional[:class:`discord.Webhook`]: Returns the debug webhook, or ``None``"""
+        if self.__wh_url is not None:
+            return discord.Webhook.from_url(self.__wh_url, client=self)
+        return None
+
+    async def send_debug_message(
+        self,
+        content: str | None = None,
+        **kwargs: Any,
+    ) -> discord.WebhookMessage | None:
+        if self.debug_webhook is None:
+            return None
+        kwargs['wait'] = True
+        return await self.debug_webhook.send(content, **kwargs)
 
     def get_prefixes_for(self, guild_id: int, /) -> list[str] | None:
         """Returns the prefixes for a guild.
@@ -353,6 +373,8 @@ class LegacyBot(commands.Bot):
             title='An error occurred!',
             colour=discord.Colour.dark_red(),
         )
+        send_debug_log = False
+
         if isinstance(error, commands.CommandOnCooldown):
             reset = context.created_at + datetime.timedelta(seconds=error.retry_after)
             embed.description = f'You are on cooldown! Try again {discord.utils.format_dt(reset, style="R")}'
@@ -379,10 +401,20 @@ class LegacyBot(commands.Bot):
             r = error.missing_role if isinstance(error.missing_role, str) else f'<@&{error.missing_role}>'
             embed.description = f'You need the {r} role to execute this command!'
         elif isinstance(error, commands.BotMissingPermissions):
-            fmt = discord.utils._human_join(error.missing_permissions, final='and')
+            fmt = discord.utils._human_join(
+                [m.replace('_', ' ').replace('guild', 'server').title()
+                 for m in error.missing_permissions
+                ],
+                final='and',
+            )
             embed.description = f'I need {fmt} permissions to execute this command!'
         elif isinstance(error, commands.MissingPermissions):
-            fmt = discord.utils._human_join(error.missing_permissions, final='and')
+            fmt = discord.utils._human_join(
+                [m.replace('_', ' ').replace('guild', 'server').title()
+                 for m in error.missing_permissions
+                ],
+                final='and',
+            )
             embed.description = f'You need {fmt} permissions to execute this command!'
         elif isinstance(error, commands.RangeError):
             fmt = []
@@ -468,7 +500,22 @@ class LegacyBot(commands.Bot):
             embed.description = f'`{error.param.name}` is missing! Make sure you follow the command syntax: `{context.command.signature}`'
         else:
             embed.description = f'An unknown exception has occurred: {error}'
+            error = getattr(error, '__original__', error)
+            send_debug_log = True
+
         await context.reply(embed=embed)
+
+        if send_debug_log:
+            await self.send_debug_message(
+                embed=discord.Embed(
+                    title=f'An unknown error occurred on {context.command.name}',
+                    description=f'Executed by: {context.author} ({context.author.id})\nExecution date: {discord.utils.format_dt(context.created_at)}',
+                    colour=discord.Colour.red(),
+                ).add_field(
+                    name='Exception traceback:',
+                    value=f'{traceback.format_exception(type(error), value=error, tb=error.__traceback__)}',
+                ),
+            )
 
     async def on_ready(self) -> None:
         if not self.user:

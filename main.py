@@ -72,7 +72,8 @@ if __name__ == "__main__":
                 users=True,
                 roles=False,
                 replied_user=False,
-            )
+            ),
+            debug_webhook_url=os.environ["DEBUG_WEBHOOK_URL"],
         ) as bot:
             async with asyncpg.create_pool(
                 #os.environ['DB_URI'].format(os.environ['DB_PASSWORD']),
