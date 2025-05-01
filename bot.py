@@ -522,3 +522,11 @@ class LegacyBot(commands.Bot):
             log.warning('Bot received the READY event but does not have a user attached!')
         else:
             log.info(f'Logged in as {self.user}')
+
+        await self.send_debug_message(
+            embed=discord.Embed(
+                title='\N{INFORMATION SOURCE} Bot ready!',
+                description='You can now set up the git repository using ``jsk sh``',
+                colour=discord.Colour.blue(),
+            ),
+        )
