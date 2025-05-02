@@ -183,6 +183,7 @@ class ConfigViewPrefixesActionRow(discord.ui.ActionRow['ConfigView']):
     @discord.ui.button(label='Save Prefixes', style=discord.ButtonStyle.green)
     async def save_prefixes(self, interaction: Interaction, button: discord.ui.Button['ConfigView']) -> None:
         assert self.view
+        assert interaction.guild_id
 
         if len(self.view.record['prefixes']) < 1:
             await interaction.response.send_message(
@@ -199,6 +200,8 @@ class ConfigViewPrefixesActionRow(discord.ui.ActionRow['ConfigView']):
                     'UPDATE guilds SET prefixes = $1::varchar[] WHERE "id" = $2;',
                     self.view.record['prefixes'], interaction.guild_id,
                 )
+
+        interaction.client._guild_prefixes[interaction.guild_id] = self.view.record['prefixes']
 
         await interaction.edit_original_response(view=self.view.update_self())
         await interaction.followup.send('Prefixes successfully saved!', ephemeral=True)
