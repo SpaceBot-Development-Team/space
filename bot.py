@@ -236,7 +236,7 @@ class LegacyBot(commands.Bot):
     async def load_disabled_modules(self) -> None:
         async with self.get_connection() as conn:
             rows = await conn.fetch(
-                'SELECT ("id", disabled_modules::text[]) FROM guilds;',
+                'SELECT "id", disabled_modules::text[] FROM guilds;',
             )
 
         for row in rows:

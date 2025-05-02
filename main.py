@@ -22,6 +22,9 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 
+import traceback
+
+
 if __name__ == "__main__":
     import asyncio
     import os
@@ -100,6 +103,15 @@ if __name__ == "__main__":
                 bot.pool = pool
 
                 discord.utils.setup_logging()
-                await bot.start(tkn, reconnect=True)
+
+                try:
+                    await bot.start(tkn, reconnect=True)
+                except Exception as exc:
+                    await bot.send_debug_message(
+                        embed=discord.Embed(
+                            title='Error When Booting Up Bot!',
+                            description=f'```py\n{traceback.format_exception(type(exc), exc, exc.__traceback__)[:3996]}```'
+                        )
+                    )
 
     asyncio.run(runner())

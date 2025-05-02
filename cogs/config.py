@@ -421,6 +421,8 @@ class ConfigView(discord.ui.LayoutView):
             discord.ui.ActionRow(ToggleModulesSelect(self.record['disabled_modules'], self.bot)),
         )
 
+        self.add_item(self.info_container)
+
         return self
 
     async def interaction_check(self, interaction: Interaction) -> bool:
