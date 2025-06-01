@@ -1178,6 +1178,7 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
         self.colour: discord.Colour = discord.Colour.from_str(self.raw_colour)
         self.light_text: bool = False
         self.spotify_logo: bool = False
+        self.browser = None
         super().__init__(timeout=3600)
 
     def get_replace_dict(self) -> dict[str, Any]:
@@ -1194,19 +1195,26 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
             "css": DEFAULT_CSS,
         }
 
+    async def on_timeout(self) -> None:
+        if self.browser:
+            await self.browser.close(reason='Session finalised')
+
     def get_html(self) -> str:
         return DEFAULT_HTML.format_map(self.get_replace_dict())
 
     async def generate_image(self) -> io.BytesIO:
         html = self.get_html()
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
+            if self.browser is None:
+                self.browser = browser = await p.chromium.launch()
+            else:
+                browser = self.browser
             page = await browser.new_page()
             await page.set_content(html, wait_until='load')
             await page.wait_for_selector('.song-image')
             elem = page.locator('.song-image')
             ss = await elem.screenshot(type='png', omit_background=True)
-            await browser.close(reason='screenshot finalised')
+            await page.close(reason='Screenshot taken')
             ret = io.BytesIO(ss)
 
         self.update_view()
