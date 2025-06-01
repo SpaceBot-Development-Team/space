@@ -24,13 +24,13 @@ DEALINGS IN THE SOFTWARE.
 
 import traceback
 
-
 if __name__ == "__main__":
     import asyncio
     import os
     import json
     import sys
 
+    import aiohttp
     import discord
     import asyncpg
     from dotenv import load_dotenv
@@ -46,6 +46,7 @@ if __name__ == "__main__":
         "cogs.meta",
         "cogs.config",
         "cogs.tools",
+        "cogs.lyrics_generator",
         "jishaku",
     ]
 
@@ -92,7 +93,8 @@ if __name__ == "__main__":
                 command_timeout=300,
                 max_size=20,
                 min_size=20,
-            ) as pool:
+            ) as pool, aiohttp.ClientSession() as session:
+                bot._session = session
                 if not DEBUG_MODE:
                     bot.status = discord.Status.idle
                     bot.activity = discord.Game('?help')

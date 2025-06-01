@@ -30,6 +30,7 @@ import traceback
 from typing import Any, Final
 from collections.abc import Iterable
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -61,6 +62,11 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
     def resolved_reference(self) -> discord.Message | None:
         """:class:`discord.Message`: The resolved reference message, or ``None``."""
         return self.reference and (self.reference.resolved or self.reference.cached_message)  # pyright: ignore[reportReturnType]
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        """:class:`aiohttp.ClientSession`: Returns the bot's session."""
+        return self.bot.session
 
     @property
     def created_at(self) -> datetime.datetime:
@@ -164,6 +170,7 @@ class LegacyBot(commands.Bot):
         intents: discord.Intents,
         initial_extensions: Iterable[str],
         debug_webhook_url: str | None = None,
+        session: aiohttp.ClientSession = MISSING,
         **options: Any,
     ) -> None:
         super().__init__(
@@ -177,6 +184,7 @@ class LegacyBot(commands.Bot):
         )
         self.pool: asyncpg.Pool[asyncpg.Record] = MISSING
         self.initial_extensions: Iterable[str] = initial_extensions
+        self._session: aiohttp.ClientSession = session
 
         # here all the guild prefixes will be saved as a
         # {guild_id: [prefix, list]} mapping
@@ -208,6 +216,13 @@ class LegacyBot(commands.Bot):
             return discord.Webhook.from_url(self.__wh_url, client=self)
         return None
 
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        """:class:`aiohttp.ClientSession`: Returns this client's session"""
+        if self._session is MISSING:
+            raise RuntimeError
+        return self._session
+
     async def send_debug_message(
         self,
         content: str | None = None,
@@ -216,7 +231,12 @@ class LegacyBot(commands.Bot):
         if self.debug_webhook is None:
             return None
         kwargs['wait'] = True
-        return await self.debug_webhook.send(content, **kwargs)
+
+        if content:
+            for chunk in discord.utils.as_chunks(content, max_size=1024):
+                await self.debug_webhook.send(''.join(chunk), **kwargs)
+        else:
+            await self.debug_webhook.send(**kwargs)
 
     def get_prefixes_for(self, guild_id: int, /) -> list[str] | None:
         """Returns the prefixes for a guild.
@@ -548,7 +568,7 @@ class LegacyBot(commands.Bot):
                     colour=discord.Colour.red(),
                 ).add_field(
                     name='Exception traceback:',
-                    value=f'{traceback.format_exception(type(error), value=error, tb=error.__traceback__)}',
+                    value=f'{traceback.format_exception(type(error), value=error, tb=error.__traceback__)}'[:1024],
                 ),
             )
 
