@@ -23,11 +23,11 @@ DEALINGS IN THE SOFTWARE.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 import datetime
 import io
 import os
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 
 try:
     import orjson as json
@@ -42,7 +42,14 @@ from playwright.async_api import async_playwright
 if TYPE_CHECKING:
     from bot import LegacyBot, LegacyBotContext as Context
 
+    from _typeshed import SupportsRichComparison
+    K = TypeVar('K', bound=SupportsRichComparison)
+else:
+    K = TypeVar('K')
+
+
 MISSING = discord.utils.MISSING
+V = TypeVar('V')
 
 
 class SpotifyHandler:
@@ -134,6 +141,42 @@ class Album:
     def best_image(self) -> SpotifyAsset:
         l = sorted(self.images, key=lambda i: (i.height, i.width))
         return l[0]
+
+
+class OrderedDict(Generic[K, V]):
+    def __init__(self) -> None:
+        self._data: dict[K, V] = {}
+
+    def __setitem__(self, key: K, value: V) -> None:
+        self._data[key] = value
+        self._data = dict(sorted(self._data.items(), key=lambda i: i[0]))
+
+    def __bool__(self) -> bool:
+        return bool(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, key: K) -> V:
+        return self._data[key]
+
+    def __contains__(self, key: K) -> bool:
+        return key in self._data
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._data)
+
+    def keys(self) -> KeysView[K]:
+        return self._data.keys()
+
+    def values(self) -> ValuesView[V]:
+        return self._data.values()
+
+    def items(self) -> ItemsView[K, V]:
+        return self._data.items()
+
+    def pop(self, key: K, default: Any = None) -> Any:
+        return self._data.pop(key, default)
 
 
 class SpotifyAsset:
@@ -394,7 +437,7 @@ class LyricsGeneratorView(discord.ui.LayoutView):
             ) if page
         }
         self.current_page: int = 0
-        self.selected_lyrics: dict[int, str] = {}
+        self.selected_lyrics: OrderedDict[int, str] = OrderedDict()
         self.author_id: int = author_id
         self.add_items_to_container()
         self.load_paginator()
@@ -552,119 +595,12 @@ DEFAULT_CSS = """
     --error-text-color: rgba(240, 40, 30, 1);
 }
 
-[contenteditable] {
-    outline: none;
-}
-
-.cloneable {
-    display: none!important;
-}
-
 body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     padding: 0;
     margin: 0;
-    background: var(--background-color);
-    color: var(--background-text-color);
-}
-
-h1, h2 {
-    margin: 0;
-    padding: 1.5rem 0 1.1rem;
-    font-size: 1.6rem;
-}
-
-.surface {
-    background: var(--surface-color);
-    color: var(--surface-text-color);
-}
-
-.primary {
-    background: var(--primary-color);
-    color: var(--primary-text-color);
-}
-
-a {
-    text-decoration: none;
-    font-weight: 600;
-    color: inherit
-}
-
-a:hover {
-    text-decoration: underline;
-}
-
-main {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-}
-
-header {
-    position: relative;
-}
-
-header > .go-to-screen, #download, #last-go-back {
-    position: absolute;
-    top: calc(50% + 0.2rem);
-    left: -1rem;
-    transform: translate(-100%, -50%);
-    border: 0;
-    border-radius: 0.5rem;
-    padding: 0.5rem;
-    background-color: var(--surface-light-color);
-    color: var(--surface-text-color);
-    transition: 150ms var(--cubic-ease-out);
-}
-
-header > .go-to-screen.right, #download {
-    right: -1rem;
-    left: auto;
-    transform: translate(100%, -50%);
-}
-
-header > .go-to-screen:hover, #download:hover, #last-go-back:hover {
-    cursor: pointer;
-    background-color: var(--surface-color);
-}
-
-footer {
-    text-align: center;
-    padding: 2.1rem;
-    height: 8rem;
-    font-size: 1.2rem;
-}
-
-#dark-mode-toggle {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0.3rem;
-    font-weight: 600;
-    padding-top: 0.5rem;
-}
-
-#dark-mode-toggle:hover {
-    cursor: pointer;
-}
-
-#dark-mode-toggle::before {
-    content: "Switch to dark";
-}
-
-.dark-mode #dark-mode-toggle::before {
-    content: "Switch to light";
-}
-
-#dark-mode-toggle > span::after {
-    content: "dark_mode";
-}
-
-.dark-mode #dark-mode-toggle > span::after {
-    content: "light_mode";
 }
 
 .song-image {
@@ -744,387 +680,7 @@ footer {
     filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(93deg) brightness(103%) contrast(103%);
 }
 
-@keyframes search-indicator {
-    0% {
-        width: 20%;
-        left: 0%;
-        transform: translate(-200%, 0);
-    }
-
-    33% {
-        width: 50%;
-        left: 20%;
-        transform: translate(0%, 0);
-    }
-
-    66% {
-        width: 40%;
-        left: 60%;
-        transform: translate(0%, 0);
-    }
-
-    100% {
-        width: 10%;
-        left: 100%;
-        transform: translate(100%, 0);
-    }
-}
-
-.searching {
-    padding: 2rem 0 1rem;
-    position: relative;
-    overflow: hidden;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.searching::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    background-color: var(--background-text-color);
-    height: 0.3rem;
-    opacity: 1;
-    transition: 100ms;
-    animation: search-indicator 1s linear infinite;
-}
-
-.searching.hidden {
-    padding: 0;
-    font-size: 0;
-}
-
-.searching.hidden::after {
-    opacity: 0;
-    height: 0;
-}
-
-.error {
-    background-color: var(--error-color);
-    color: var(--error-text-color);
-    padding: 1rem;
-    border-radius: 0.5rem;
-    margin-top: 2rem;
-    text-align: center;
-    font-size: 0.9rem;
-    transition: 250ms var(--cubic-ease-out);
-}
-
-.error.hidden {
-    margin-top: 0;
-    padding: 0;
-    font-size: 0;
-    transition: 150ms var(--cubic-ease-out);
-}
-
-/**
- * Screens
- */
-.lyrics-image-screen {
-    width: 100%;
-    overflow: hidden;
-    opacity: 1;
-    transition: width 500ms ease-in-out, opacity 300ms ease-in-out 200ms;
-}
-
-.lyrics-image-screen.hidden {
-    opacity: 0;
-    width: 0%;
-    transition: width 500ms ease-in-out, opacity 300ms;
-}
-
-.screen-wrapper {
-    width: 100vw;
-    min-height: calc(100vh - 8rem);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transition: transform 500ms ease-in-out;
-}
-
-.hidden.left .screen-wrapper {
-    transform: translate(-100%, 0);
-}
-
-/* Screen 1: Search form */
-.search-form header {
-    text-align: center;
-}
-
-.search-form form {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    width: 100%;
-}
-
-.search-form form > input {
-    padding: 1rem;
-    border: none;
-    border-radius: 0.5rem;
-    outline: none;
-    width: 80%;
-    max-width: 25rem;
-}
-
-.search-form form > button {
-    text-align: center;
-    padding: 1rem 1.5rem;
-    border: none;
-    border-radius: 0.5rem;
-    outline: none;
-    font-weight: 600;
-    opacity: 1;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.search-form form > button:hover {
-    cursor: pointer;
-    padding: 1rem 3rem;
-}
-
-.search-form form > button:disabled {
-    font-size: 0;
-    padding: 0;
-    opacity: 0;
-}
-
-/* Screen 2: Song selection */
-.search-results .song-selection {
-    display: flex;
-    justify-content: space-between;
-    row-gap: 2rem;
-    max-width: 50rem;
-    padding: 2rem;
-    flex-wrap: wrap;
-}
-
-.select-song {
-    width: 30%;
-    padding: 1rem;
-    background-color: var(--surface-light-color);
-    border-radius: 0.5rem;
-    transition: scale 200ms var(--cubic-ease-out),
-        background-color 200ms var(--cubic-ease-out);
-}
-
-.select-song:hover {
-    cursor: pointer;
-    background-color: var(--surface-color);
-    scale: 1.05;
-}
-
-.select-song img {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-    object-position: center 0;
-    opacity: 1;
-    border-radius: 0.5rem;
-    transition: scale 150ms var(--cubic-ease-out),
-        aspect-ratio 400ms var(--cubic-ease-out),
-        opacity 600ms var(--cubic-ease-out);
-}
-
-.select-song:hover img {
-    scale: 1.05;
-}
-
-.hidden .select-song img {
-    aspect-ratio: 10;
-    opacity: 0;
-    transition: aspect-ratio 400ms var(--cubic-ease-out) 100ms,
-        opacity 400ms var(--cubic-ease-out) 100ms;
-}
-
-.select-song .name {
-    font-weight: 700;
-    padding-top: 0.5rem;
-    transition: 300ms var(--cubic-ease-out);
-}
-
-.hidden .select-song .name {
-    font-size: 0;
-    padding-top: 0;
-    transition: 300ms var(--cubic-ease-out) 100ms;
-}
-
-.select-song .authors {
-    font-weight: 600;
-    font-size: 0.8rem;
-    transition: 300ms var(--cubic-ease-out);
-}
-
-.hidden .select-song .authors {
-    font-size: 0;
-    transition: 300ms var(--cubic-ease-out) 100ms;
-}
-
-/* Screen 3: Lines selection */
-.lines-selection {
-    padding-top: 1.5rem;
-    width: 80%;
-    max-width: 30rem;
-}
-
-.select-line {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 0.5rem;
-    background-color: var(--surface-light-color);
-    text-align: center;
-    font-size: 1.1rem;
-    font-weight: 600;
-    width: 100%;
-    margin: 0 auto 1rem;
-    transition: padding 400ms var(--cubic-ease-out),
-        margin-bottom 400ms var(--cubic-ease-out),
-        font-size 400ms var(--cubic-ease-out),
-        width 400ms var(--cubic-ease-out),
-        background-color 200ms var(--cubic-ease-out),
-        scale 200ms var(--cubic-ease-out);
-}
-
-.select-line:hover {
-    cursor: pointer;
-    background-color: var(--surface-color);
-    scale: 1.05;
-}
-
-.hidden .select-line,
-.select-line.hidden {
-    padding: 0;
-    margin-bottom: 0;
-    font-size: 0;
-    width: 0;
-}
-
-.select-line.selected {
-    background-color: var(--primary-color);
-    color: var(--primary-text-color);
-}
-
-/* Screen 4: Final options and download */
-.final-options header {
-    margin-bottom: 1rem;
-}
-
-.final-options .searching {
-    margin-bottom: 2rem;
-}
-
-.final-options .searching.hidden {
-    margin-bottom: 0;
-}
-
-.color-selection {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    row-gap: 0.8rem;
-    max-width: 15rem;
-    width: 80%;
-    padding: 2rem 1rem;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.hidden .color-selection {
-    padding: 0 1rem;
-}
-
-.color-selection > div {
-    width: 21%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    color: transparent;
-    transition: 150ms var(--cubic-ease-out);
-}
-
-.color-selection > div:hover {
-    cursor: pointer;
-    scale: 1.1;
-}
-
-.hidden .color-selection > div {
-    width: 0;
-}
-
-#custom-color {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: var(--background-text-color);
-    border: 1px solid var(--background-text-color);
-}
-
-#custom-color > input {
-    height: 0;
-    width: 0;
-    padding: 0;
-    border: none;
-}
-
-#custom-color > label:hover {
-    cursor: pointer;
-}
-
-.switch-container {
-    display: flex;
-    align-items: center;
-    max-width: 15rem;
-    width: 80%;
-    padding: 0rem 1rem 1rem;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.switch-container:hover {
-    cursor: pointer;
-}
-
-.hidden .switch-container {
-    font-size: 0;
-    padding: 0;
-}
-
-.switch {
-    position: relative;
-    width: 4rem;
-    height: 2rem;
-    border-radius: 1rem;
-    border: 1px solid var(--background-text-color);
-    margin-right: 1rem;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.hidden .switch {
-    height: 0;
-}
-
-.switch::after {
-    content: "";
-    display: block;
-    position: absolute;
-    top: 50%;
-    left: 0.25rem;
-    transform: translate(0, -50%);
-    height: 1.5rem;
-    aspect-ratio: 1;
-    background-color: var(--background-text-color);
-    border-radius: 50%;
-    transition: 200ms var(--cubic-ease-out);
-}
-
-.light-text #light-text .switch::after {
-    left: calc(100% - 1.75rem);
-}
-
 .spotify-tag #spotify-tag .switch::after {
-    left: calc(100% - 1.75rem);
-}
-
-.additional-bg #additional-bg .switch::after {
     left: calc(100% - 1.75rem);
 }
 
@@ -1178,6 +734,7 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
         self.colour: discord.Colour = discord.Colour.from_str(self.raw_colour)
         self.light_text: bool = False
         self.spotify_logo: bool = False
+        self.playwright = None
         self.browser = None
         super().__init__(timeout=3600)
 
@@ -1198,25 +755,33 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
     async def on_timeout(self) -> None:
         if self.browser:
             await self.browser.close(reason='Session finalised')
+        if self.playwright:
+            await self.playwright.stop()
 
     def get_html(self) -> str:
         return DEFAULT_HTML.format_map(self.get_replace_dict())
 
     async def generate_image(self) -> io.BytesIO:
         html = self.get_html()
-        async with async_playwright() as p:
-            if self.browser is None:
-                self.browser = browser = await p.chromium.launch()
-            else:
-                browser = self.browser
-            page = await browser.new_page()
-            await page.set_content(html, wait_until='load')
-            await page.wait_for_selector('.song-image')
-            elem = page.locator('.song-image')
-            ss = await elem.screenshot(type='png', omit_background=True)
-            await page.close(reason='Screenshot taken')
-            ret = io.BytesIO(ss)
 
+        if self.playwright is None:
+            self.playwright = p = await async_playwright().start()
+        else:
+            p = self.playwright
+
+        if self.browser is None:
+            self.browser = browser = await p.chromium.launch()
+        else:
+            browser = self.browser
+
+        page = await browser.new_page()
+        await page.set_content(html, wait_until='load')
+        await page.wait_for_selector('.song-image')
+        elem = page.locator('.song-image')
+        ss = await elem.screenshot(omit_background=True, scale='css')
+        await page.close(reason='Screenshot finalised')
+
+        ret = io.BytesIO(ss)
         self.update_view()
         return ret
 
@@ -1238,20 +803,44 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
             discord.ui.ActionRow(
                 #ToggleConfigButton(self.spotify_logo, 'spotify_logo', label='Toggle Spotify Logo'),
                 ToggleConfigButton(self.light_text, 'light_text', label='Toggle Light Text'),
-                ReturnToLyricsSelector(self.parent),
+                FinishButton(self),
+                ReturnToLyricsSelector(self, self.parent),
             ),
         )
 
 
+class FinishButton(discord.ui.Button['LyricsImageSettingsView']):
+    def __init__(self, parent: LyricsImageSettingsView) -> None:
+        self.parent = parent
+        super().__init__(
+            style=discord.ButtonStyle.green,
+            label='Finish',
+        )
+
+    async def callback(self, interaction: discord.Interaction[LegacyBot]) -> None:
+        ret = await self.parent.generate_image()
+        file = discord.File(ret, filename='image.png')
+        view = discord.ui.LayoutView().add_item(
+                discord.ui.MediaGallery(discord.MediaGalleryItem('attachment://image.png')
+            ),
+        )
+        await self.parent.on_timeout()
+        self.parent.stop()
+        await interaction.response.edit_message(attachments=[file], view=view)
+
+
 class ReturnToLyricsSelector(discord.ui.Button['LyricsImageSettingsView']):
-    def __init__(self, parent: LyricsGeneratorView) -> None:
+    def __init__(self, prev: LyricsImageSettingsView, parent: LyricsGeneratorView) -> None:
         self.parent: LyricsGeneratorView = parent
+        self.prev = prev
         super().__init__(
             style=discord.ButtonStyle.grey,
             label='Go Back',
         )
 
     async def callback(self, interaction: discord.Interaction[LegacyBot]) -> None:
+        await self.prev.on_timeout()
+        self.prev.stop()
         await interaction.response.edit_message(attachments=[], view=self.parent)
 
 
