@@ -221,7 +221,7 @@ class DBStore:
 
         Parameters
         ----------
-        keu: Union[Any, Tuple[Any, ...]]
+        key: Union[Any, Tuple[Any, ...]]
             The key to pop, this should be a tuple if the primary keys was a sequence
             of more than 1 items.
 
@@ -242,7 +242,7 @@ class DBStore:
         # remove it from the db
 
         values_v = list(key) if isinstance(key, tuple) else [key]
-        values = dict((self._keys, values_v))
+        values = dict(zip(self._keys, values_v))
         await self._remove_key(values)
         return data
 
@@ -269,27 +269,18 @@ class DBStore:
         self._data[key] = value
         value_keys = list(value.keys())
         value_values = list(value.values())
-        resolved_keys = list(key) if isinstance(key, list) else [key]
-        resolved_value_map = dict(
-            zip(self._keys + value_keys, resolved_keys + value_values)
-        )
-        resolved_key_map = dict(
-            zip(self._keys, resolved_keys),
-        )
+
+        resolved_keys = list(key) if isinstance(key, tuple) else [key]
+        resolved_value_map = dict(zip(self._keys + value_keys, resolved_keys + value_values))
+        resolved_key_map = dict(zip(self._keys, resolved_keys))
 
         if exists:
             base = self._get_update_query(value)
-            where = self._get_where_query(
-                resolved_key_map,
-                len(value) + 1,
-            )
+            where = self._get_where_query(resolved_key_map, len(value) + 1)
             values = self._run_factories(value, 'save')
-
             query = f'{base} WHERE {where}'
         else:
-            query = self._get_insert_query(
-                resolved_value_map,
-            )
+            query = self._get_insert_query(resolved_value_map)
             values = self._run_factories(resolved_value_map, 'save')
 
         async with self.bot.get_connection() as conn:
@@ -346,6 +337,6 @@ class DBStore:
         """
 
         values_v = list(key) if isinstance(key, tuple) else [key]
-        values = dict((self._keys, values_v))
+        values = dict(zip(self._keys, values_v))
         await self._remove_key(values)
         self._data.pop(key, None)
