@@ -330,6 +330,7 @@ class Giveaways(commands.Cog):
 
     def cog_load(self) -> None:
         self.end_giveaways.start()
+        self.load_and_save_configs.start()
         self.bot.add_dynamic_items(JoinGiveaway, LeaveGiveaway)
 
     def cog_unload(self) -> None:
@@ -340,6 +341,13 @@ class Giveaways(commands.Cog):
             self.end_giveaways.stop()
 
         self.bot.remove_dynamic_items(JoinGiveaway, LeaveGiveaway)
+
+        if self.load_and_save_configs.is_running():
+            self.load_and_save_configs.stop()
+
+    @tasks.loop(minutes=1)
+    async def load_and_save_configs(self):
+        await self.claimtimes.load()
 
     async def get_giveaway_participants(self, message: discord.PartialMessage, /) -> list[int]:
         if message.guild is None:

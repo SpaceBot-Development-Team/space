@@ -332,6 +332,13 @@ class ConfigView(discord.ui.LayoutView):
 
         if self.message:
             await self.message.edit(view=self)
+        self.stop()
+
+    def stop(self) -> None:
+        cog: Configuration | None = self.bot.get_cog('Configuration')  # type: ignore
+        if cog:
+            cog.gconfig_panels.pop(self.record['id'], None)
+        super().stop()
 
     async def start(self) -> ConfigView:
         self.message = await self.ctx.reply(view=self)
@@ -564,16 +571,34 @@ class GConfigView(discord.ui.View):
         'message',
     )
 
-    def __init__(self, claimtime: asyncpg.Record, *, premium: bool, author: discord.abc.Snowflake) -> None:
+    def __init__(self, claimtime: asyncpg.Record, *, premium: bool, author: discord.abc.Snowflake, bot: LegacyBot, guild_id: int) -> None:
         self.claimtime: dict[str, Any] = dict(claimtime)
         self.premium: bool = premium
         self.author: discord.abc.Snowflake = author
         self.message: discord.Message | None = None
+        self.bot: LegacyBot = bot
+        self.guild_id: int = guild_id
         super().__init__(timeout=60*15)
 
         if claimtime["winmsg_enabled"] is True:
             self.enable_win_message.label = 'Disable'
             self.enable_win_message.style = discord.ButtonStyle.red
+
+    async def on_timeout(self) -> None:
+        for child in self.walk_children():
+            if hasattr(child, 'disabled'):
+                child.disabled = True
+
+        if self.message:
+            await self.message.edit(view=self)
+        self.stop()
+
+    def stop(self) -> None:
+        cog: Configuration | None = self.bot.get_cog('Configuration')  # type: ignore
+
+        if cog:
+            cog.gconfig_panels.pop(self.guild_id, None)
+        super().stop()
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if interaction.user.id != self.author.id:
@@ -902,7 +927,7 @@ class Configuration(commands.Cog):
             raise RuntimeError('row returned none')
         return row
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(minutes=1)
     async def load_and_cache_configs(self) -> None:
         rows = await self.get_guilds_config()
 
@@ -997,6 +1022,8 @@ class Configuration(commands.Cog):
             config,
             premium=premium,
             author=ctx.author,
+            bot=self.bot,
+            guild_id=ctx.guild.id,
         ).start(ctx)
 
 
