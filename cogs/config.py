@@ -338,7 +338,7 @@ class ConfigView(discord.ui.LayoutView):
     async def on_timeout(self) -> None:
         for child in self.walk_children():
             if hasattr(child, 'disabled'):
-                child.disabled = True
+                child.disabled = True  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.message:
             await self.message.edit(view=self)
@@ -592,7 +592,7 @@ class GConfigView(discord.ui.View):
     async def on_timeout(self) -> None:
         for child in self.walk_children():
             if hasattr(child, 'disabled'):
-                child.disabled = True
+                child.disabled = True  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.message:
             await self.message.edit(view=self)
