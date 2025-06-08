@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -58,8 +59,10 @@ if TYPE_CHECKING:
         host: discord.abc.User
         winner: discord.Member
 
+
 DURATION_REGEX = re.compile(r'(\d{1,5}(?:[.,]?\d{1,5})?)([smhd])')
 log = logging.getLogger(__name__)
+
 
 class WinnersConverter(commands.Converter[int]):
     __slots__ = ()
@@ -92,7 +95,7 @@ class Duration(commands.Converter["Duration"]):
         'resolved',
     )
 
-    CONVERT_MAP = {'d': 86400,'h': 3600, 'm': 60, 's': 1}
+    CONVERT_MAP = {'d': 86400, 'h': 3600, 'm': 60, 's': 1}
 
     if TYPE_CHECKING:
         relative_float: float
@@ -124,26 +127,47 @@ def replace_vars(string: str, data: EmbedVariablesData, /) -> str:
     winner_list = ', '.join([f'<@{user}>' for user in data['winner_list']]) if data['winner_list'] else None
     host = data['host']
     ends_at = data['ends_at']
-    return string.replace(
-        '{prize}', data['prize'],
-    ).replace(
-        '{host(username)}', host.name,
-    ).replace(
-        '{host(mention)}', host.mention,
-    ).replace(
-        '{time_left}', discord.utils.format_dt(ends_at, 'R'),
-    ).replace(
-        '{end_time}', discord.utils.format_dt(ends_at, 'F'),
-    ).replace(
-        '{num_winners}', str(data['winner_amount']),
-    ).replace(
-        '{ends}', ends,
-    ).replace(
-        '{server_name}', data['guild'].name,
-    ).replace(
-        '{winner_list}', winner_list or 'Not decided',
-    ).replace(
-        '{winners}', winner_list if winner_list is not None else str(data['winner_amount']),
+    return (
+        string.replace(
+            '{prize}',
+            data['prize'],
+        )
+        .replace(
+            '{host(username)}',
+            host.name,
+        )
+        .replace(
+            '{host(mention)}',
+            host.mention,
+        )
+        .replace(
+            '{time_left}',
+            discord.utils.format_dt(ends_at, 'R'),
+        )
+        .replace(
+            '{end_time}',
+            discord.utils.format_dt(ends_at, 'F'),
+        )
+        .replace(
+            '{num_winners}',
+            str(data['winner_amount']),
+        )
+        .replace(
+            '{ends}',
+            ends,
+        )
+        .replace(
+            '{server_name}',
+            data['guild'].name,
+        )
+        .replace(
+            '{winner_list}',
+            winner_list or 'Not decided',
+        )
+        .replace(
+            '{winners}',
+            winner_list if winner_list is not None else str(data['winner_amount']),
+        )
     )
 
 
@@ -152,26 +176,47 @@ def replace_win_message_vars(string: str, data: WinMessageVariablesData, /) -> s
     winner = data["winner"]
     created_at = winner.created_at
     joined_at = winner.joined_at or datetime.datetime.now(datetime.timezone.utc)
-    return string.replace(
-        '{claim_time}', f'{data["claimtime"]} seconds',
-    ).replace(
-        '{host(username)}', host.name,
-    ).replace(
-        '{host(mention)}', host.mention,
-    ).replace(
-        '{winner(username)}', winner.name,
-    ).replace(
-        '{winner(mention)}', winner.mention,
-    ).replace(
-        '{winner(created_ago)}', discord.utils.format_dt(created_at, 'R'),
-    ).replace(
-        '{winner(created_date)}', discord.utils.format_dt(created_at, 'f'),
-    ).replace(
-        '{winner(joined_ago)}', discord.utils.format_dt(joined_at, 'R'),
-    ).replace(
-        '{winner(joined_date)}', discord.utils.format_dt(joined_at, 'f'),
-    ).replace(
-        '{prize}', data["prize"],
+    return (
+        string.replace(
+            '{claim_time}',
+            f'{data["claimtime"]} seconds',
+        )
+        .replace(
+            '{host(username)}',
+            host.name,
+        )
+        .replace(
+            '{host(mention)}',
+            host.mention,
+        )
+        .replace(
+            '{winner(username)}',
+            winner.name,
+        )
+        .replace(
+            '{winner(mention)}',
+            winner.mention,
+        )
+        .replace(
+            '{winner(created_ago)}',
+            discord.utils.format_dt(created_at, 'R'),
+        )
+        .replace(
+            '{winner(created_date)}',
+            discord.utils.format_dt(created_at, 'f'),
+        )
+        .replace(
+            '{winner(joined_ago)}',
+            discord.utils.format_dt(joined_at, 'R'),
+        )
+        .replace(
+            '{winner(joined_date)}',
+            discord.utils.format_dt(joined_at, 'f'),
+        )
+        .replace(
+            '{prize}',
+            data["prize"],
+        )
     )
 
 
@@ -225,7 +270,8 @@ class LeaveGiveaway(discord.ui.DynamicItem[discord.ui.Button], template=r'leave_
             async with conn.transaction():
                 await conn.execute(
                     'DELETE FROM giveaway_participants WHERE message_id=$1 AND user_id=$2;',
-                    self.message_id, interaction.user.id,
+                    self.message_id,
+                    interaction.user.id,
                 )
         await interaction.edit_original_response(
             content='You have left the giveaway!',
@@ -288,7 +334,10 @@ class JoinGiveaway(discord.ui.DynamicItem[discord.ui.Button], template=r'join_gi
                     await conn.execute(
                         'INSERT INTO giveaway_participants (guild_id, channel_id, message_id, user_id) VALUES '
                         '($1, $2, $3, $4)',
-                        interaction.message.id, interaction.message.channel.id, interaction.message.id, interaction.user.id,
+                        interaction.message.id,
+                        interaction.message.channel.id,
+                        interaction.message.id,
+                        interaction.user.id,
                     )
         except asyncpg.UniqueViolationError:
             await interaction.followup.send(
@@ -305,6 +354,7 @@ class JoinGiveaway(discord.ui.DynamicItem[discord.ui.Button], template=r'join_gi
                 'You have joined this giveaway successfully!',
                 ephemeral=True,
             )
+
 
 PartialMessage = Annotated[discord.PartialMessage | None, commands.PartialMessageConverter]
 
@@ -421,7 +471,7 @@ class Giveaways(commands.Cog):
                     new[key] = {
                         'text': replace_vars(value['text'], data),
                     }
-                    
+
                     icon_url = value.get('icon_url')
                     if icon_url:
                         new[key]['icon_url'] = replace_url(icon_url, data)  # type: ignore
@@ -520,19 +570,27 @@ class Giveaways(commands.Cog):
                     'guild': ctx.guild,
                     'winner_amount': winners,
                     'winner_list': None,
-                }
+                },
             )
 
             view = discord.ui.View(timeout=None)
             view.add_item(JoinGiveaway())
-            msg = await ctx.channel.send(content=':tada: **GIVEAWAY!** :tada:', embed=discord.Embed.from_dict(embed), view=view)
+            msg = await ctx.channel.send(
+                content=':tada: **GIVEAWAY!** :tada:', embed=discord.Embed.from_dict(embed), view=view
+            )
 
             async with ctx.get_connection() as conn:
                 async with conn.transaction():
                     await conn.execute(
                         'INSERT INTO giveaways (guild_id, channel_id, message_id, winner_amount, ends_at, prize, host_id) '
                         'VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                        ctx.guild.id, ctx.channel.id, msg.id, winners, duration.resolved, prize, ctx.author.id,
+                        ctx.guild.id,
+                        ctx.channel.id,
+                        msg.id,
+                        winners,
+                        duration.resolved,
+                        prize,
+                        ctx.author.id,
                     )
 
         if ctx.interaction:
@@ -572,7 +630,7 @@ class Giveaways(commands.Cog):
 
         channel = (giveaway and giveaway.channel) or ctx.channel
 
-        if not isinstance(channel, discord.abc.GuildChannel):
+        if not isinstance(channel, discord.abc.GuildChannel) or isinstance(channel, discord.ForumChannel):
             await ctx.reply('Non-valid giveaway message channel provided!')
             return
 
@@ -590,7 +648,9 @@ class Giveaways(commands.Cog):
         try:
             ret = await self.bot.get_or_fetch_members(ctx.guild, winner_id, record['host_id'])
         except (ValueError, discord.NotFound):
-            await ctx.reply('Could not resolve the winner into a member. This is most likely an error on Discord side.', ephemeral=True)
+            await ctx.reply(
+                'Could not resolve the winner into a member. This is most likely an error on Discord side.', ephemeral=True
+            )
             return
 
         if len(ret) < 2:
@@ -641,9 +701,7 @@ class Giveaways(commands.Cog):
                 record = await self.get_latest_giveaway(ctx.channel)  # pyright: ignore[reportArgumentType]
 
         if record is None:
-            await ctx.reply(
-                "Could not find any giveaways in this channel!", ephemeral=True
-            )
+            await ctx.reply("Could not find any giveaways in this channel!", ephemeral=True)
             return
 
         await self.end_giveaway(record, wait=False)
@@ -667,7 +725,9 @@ class Giveaways(commands.Cog):
 
         gw = await self.bot.pool.fetchrow(
             'SELECT * FROM giveaways WHERE guild_id=$1 AND channel_id=$2 AND ends_at < $3 ORDER BY ends_at LIMIT 1;',
-            guild, chid, datetime.datetime.now(datetime.timezone.utc),
+            guild,
+            chid,
+            datetime.datetime.now(datetime.timezone.utc),
         )
 
         if gw is None:
@@ -682,11 +742,7 @@ class Giveaways(commands.Cog):
         guild_id = record['guild_id']
         guild = self.bot.get_guild(guild_id)
         host_id = record['host_id']
-        host = (
-            (guild and guild.get_member(host_id)) or
-            self.bot.get_user(host_id) or
-            (await self.bot.fetch_user(host_id))
-        )
+        host = (guild and guild.get_member(host_id)) or self.bot.get_user(host_id) or (await self.bot.fetch_user(host_id))
         prize = record["prize"]
 
         channel = self.bot.get_partial_messageable(
@@ -723,9 +779,7 @@ class Giveaways(commands.Cog):
             )
 
             for winner in winner_list:
-                await message.reply(
-                    f'Congrats <@{winner}>! You have won **{record["prize"]}**!'
-                )
+                await message.reply(f'Congrats <@{winner}>! You have won **{record["prize"]}**!')
 
             win_message = self.claimtimes.get_win_message(guild.id)
 
@@ -742,9 +796,7 @@ class Giveaways(commands.Cog):
                         'winner': winner,
                         'prize': prize,
                     }
-                    task = asyncio.create_task(
-                        self.send_and_end_claimtime(claimtime, data, message, win_message)
-                    )
+                    task = asyncio.create_task(self.send_and_end_claimtime(claimtime, data, message, win_message))
                     self._claimtime_tasks.add(task)
                     task.add_done_callback(self._claimtime_tasks.remove)
 
@@ -756,13 +808,15 @@ class Giveaways(commands.Cog):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE giveaways SET ended=$1, winner_list=$2::bigint[] WHERE message_id=$3;',
-                    True, winner_list, message.id,
+                    True,
+                    winner_list,
+                    message.id,
                 )
 
-    async def send_and_end_claimtime(self, time: float, data: WinMessageVariablesData, message: discord.PartialMessage, win_message: str) -> None:
-        ret = await message.reply(
-            replace_win_message_vars(win_message, data)
-        )
+    async def send_and_end_claimtime(
+        self, time: float, data: WinMessageVariablesData, message: discord.PartialMessage, win_message: str
+    ) -> None:
+        ret = await message.reply(replace_win_message_vars(win_message, data))
         await asyncio.sleep(time)
         await ret.reply(f'{time:.2f} seconds finished!')
 
@@ -782,7 +836,9 @@ class Giveaways(commands.Cog):
                 for gw in gws:
                     await conn.execute(
                         'DELETE FROM giveaway_participants WHERE guild_id=$1 AND channel_id=$2 AND message_id=$3;',
-                        gw['guild_id'], gw['channel_id'], gw['message_id'],
+                        gw['guild_id'],
+                        gw['channel_id'],
+                        gw['message_id'],
                     )
 
     @tasks.loop(seconds=5)
@@ -813,11 +869,14 @@ class Giveaways(commands.Cog):
             async with conn.transaction():
                 await conn.execute(
                     'DELETE FROM giveaway_participants WHERE guild_id=$1 AND user_id=$2;',
-                    guild_id, user_id,
+                    guild_id,
+                    user_id,
                 )
+
 
 async def setup(bot: LegacyBot) -> None:
     await bot.add_cog(Giveaways(bot))
+
 
 async def teardown(bot: LegacyBot) -> None:
     await bot.remove_cog(Giveaways.__cog_name__)

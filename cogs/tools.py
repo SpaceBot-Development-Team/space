@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Literal
@@ -217,6 +218,7 @@ class Tools(commands.Cog):
 
 async def setup(bot: LegacyBot) -> None:
     await bot.add_cog(Tools(bot))
+
 
 async def teardown(bot: LegacyBot) -> None:
     await bot.remove_cog(Tools.__cog_name__)

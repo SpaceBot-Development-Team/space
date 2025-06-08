@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     from bot import LegacyBot, LegacyBotContext as Context
 
     from _typeshed import SupportsRichComparison
+
     K = TypeVar('K', bound=SupportsRichComparison)
 else:
     K = TypeVar('K')
@@ -71,7 +73,7 @@ class SpotifyHandler:
                 'grant_type': 'client_credentials',
                 'client_id': self.client_id,
                 'client_secret': self.client_secret,
-            }
+            },
         ) as response:
             data = await response.json(loads=json.loads)
 
@@ -80,7 +82,9 @@ class SpotifyHandler:
 
             self.access_token = data['access_token']
             self.token_type = data['token_type']
-            self.expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=int(data['expires_in']))
+            self.expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+                seconds=int(data['expires_in'])
+            )
 
     async def search_songs(self, query: str, /) -> list[Song]:
         async with self.bot.session.get(
@@ -92,7 +96,7 @@ class SpotifyHandler:
             },
             headers={
                 'Authorization': f'{self.token_type} {self.access_token}',
-            }
+            },
         ) as response:
             data = await response.json(loads=json.loads)
 
@@ -160,7 +164,7 @@ class OrderedDict(Generic[K, V]):
     def __getitem__(self, key: K) -> V:
         return self._data[key]
 
-    def __contains__(self, key: K) -> bool:
+    def __contains__(self, key: Any) -> bool:
         return key in self._data
 
     def __iter__(self) -> Iterator[K]:
@@ -210,7 +214,9 @@ class SpotifyAsset:
         return f'{self._parent_name}-{self.height}x{self.width}.jpeg'
 
     @classmethod
-    def _from_images(cls, images: list[dict[str, Any]], parent_name: str, session: aiohttp.ClientSession) -> list[SpotifyAsset]:
+    def _from_images(
+        cls, images: list[dict[str, Any]], parent_name: str, session: aiohttp.ClientSession
+    ) -> list[SpotifyAsset]:
         return [cls(d, parent_name, session) for d in images]
 
 
@@ -294,7 +300,7 @@ class SelectSongView(discord.ui.LayoutView):
                 f'**Name:** {song.name} | **Artist(s):** {", ".join(a.name for a in song.artists)}',
                 f'**Album:** {song.album.name} | **Track:** {song.track}',
                 f'**Explicit:** {"Yes" if song.explicit else "No"} | **Popularity:** {song.popularity}/100',
-                accessory=discord.ui.Thumbnail(song.thumbnail_url)
+                accessory=discord.ui.Thumbnail(song.thumbnail_url),
             )
             select_options.append(
                 discord.SelectOption(
@@ -310,12 +316,11 @@ class SelectSongView(discord.ui.LayoutView):
             ),
         )
 
-
     async def on_timeout(self) -> None:
         if self.message is not MISSING:
             for child in self.walk_children():
                 if hasattr(child, 'disabled'):
-                    child.disabled = True
+                    child.disabled = True  # pyright: ignore[reportAttributeAccessIssue]
             await self.message.edit(view=self)
 
 
@@ -431,10 +436,8 @@ class LyricsGeneratorView(discord.ui.LayoutView):
         self.lyrics: list[str] = lyrics
         self.paged_lyrics: dict[int, list[str]] = {
             page_id: page
-            for page_id, page
-            in enumerate(
-                discord.utils.as_chunks([l for l in self.lyrics if l], max_size=10)
-            ) if page
+            for page_id, page in enumerate(discord.utils.as_chunks([l for l in self.lyrics if l], max_size=10))
+            if page
         }
         self.current_page: int = 0
         self.selected_lyrics: OrderedDict[int, str] = OrderedDict()
@@ -552,9 +555,11 @@ class GenerateLyrics(discord.ui.Button['LyricsGeneratorView']):
             return
 
         await interaction.response.edit_message(
-            view=discord.ui.LayoutView().add_item(
+            view=discord.ui.LayoutView()
+            .add_item(
                 discord.ui.TextDisplay('Generating lyrics, please wait...'),
-            ).add_item(
+            )
+            .add_item(
                 discord.ui.TextDisplay('This message will be automatically updated when the process is done!'),
             )
         )
@@ -801,7 +806,7 @@ class LyricsImageSettingsView(discord.ui.LayoutView):
         )
         self.container.add_item(
             discord.ui.ActionRow(
-                #ToggleConfigButton(self.spotify_logo, 'spotify_logo', label='Toggle Spotify Logo'),
+                # ToggleConfigButton(self.spotify_logo, 'spotify_logo', label='Toggle Spotify Logo'),
                 ToggleConfigButton(self.light_text, 'light_text', label='Toggle Light Text'),
                 FinishButton(self),
                 ReturnToLyricsSelector(self, self.parent),
@@ -821,8 +826,7 @@ class FinishButton(discord.ui.Button['LyricsImageSettingsView']):
         ret = await self.parent.generate_image()
         file = discord.File(ret, filename='image.png')
         view = discord.ui.LayoutView().add_item(
-                discord.ui.MediaGallery(discord.MediaGalleryItem('attachment://image.png')
-            ),
+            discord.ui.MediaGallery(discord.MediaGalleryItem('attachment://image.png')),
         )
         await self.parent.on_timeout()
         self.parent.stop()
@@ -956,7 +960,9 @@ class LyricsGenerator(commands.Cog):
 
     @commands.hybrid_command(name='generate-lyrics')
     @commands.cooldown(
-        1, 30, commands.BucketType.user,
+        1,
+        30,
+        commands.BucketType.user,
     )
     async def generate_lyrics(self, ctx: Context, *, query: str) -> None:
         """Generates a song's lyrics.

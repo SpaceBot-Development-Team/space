@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, overload
@@ -36,8 +37,10 @@ ReplaceableFactory = Callable[[str, Any, int], str]
 D = TypeVar('D')
 MISSING = discord.utils.MISSING
 
+
 def default_value_factory(name: str, value: Any, mode: Literal['save', 'load', 'delete']) -> Any:
     return value
+
 
 def default_replaceable_factory(name: str, value: Any, pos: int) -> str:
     return f'${pos}'
@@ -88,7 +91,7 @@ class DBStore:
         keys: list[str] | str,
         *,
         value_factory: ValueFactory = default_value_factory,
-        query_replaceable_factory: ReplaceableFactory = default_replaceable_factory,    
+        query_replaceable_factory: ReplaceableFactory = default_replaceable_factory,
     ) -> None:
         self.bot: LegacyBot = bot
         self.table: str = table
@@ -107,9 +110,7 @@ class DBStore:
         checks = []
 
         for no, (field, value) in enumerate(fields.items(), start):
-            checks.append(
-                f'{field} = {self._replaceable_factory(field, value, no)}'
-            )
+            checks.append(f'{field} = {self._replaceable_factory(field, value, no)}')
 
         return ' AND '.join(checks)
 
@@ -123,9 +124,7 @@ class DBStore:
         ret = []
 
         for name, value in values.items():
-            ret.append(
-                self._factory(name, value, mode)
-            )
+            ret.append(self._factory(name, value, mode))
         return ret
 
     async def _remove_key(self, values: dict[str, Any]) -> None:
@@ -174,20 +173,16 @@ class DBStore:
         self._data.clear()
 
     @overload
-    def get(self, key: tuple[Any, ...]) -> dict[str, Any] | None:
-        ...
+    def get(self, key: tuple[Any, ...]) -> dict[str, Any] | None: ...
 
     @overload
-    def get(self, key: tuple[Any, ...], default: D) -> dict[str, Any] | D:
-        ...
+    def get(self, key: tuple[Any, ...], default: D) -> dict[str, Any] | D: ...
 
     @overload
-    def get(self, key: Any) -> dict[str, Any] | None:
-        ...
+    def get(self, key: Any) -> dict[str, Any] | None: ...
 
     @overload
-    def get(self, key: Any, default: D) -> dict[str, Any] | D:
-        ...
+    def get(self, key: Any, default: D) -> dict[str, Any] | D: ...
 
     def get(self, key: Any, default: D = None) -> dict[str, Any] | D:
         """Gets a key from the store.
@@ -209,12 +204,10 @@ class DBStore:
         return self._data.get(key, default)
 
     @overload
-    async def pop(self, key: tuple[Any, ...]) -> dict[str, Any]:
-        ...
+    async def pop(self, key: tuple[Any, ...]) -> dict[str, Any]: ...
 
     @overload
-    async def pop(self, key: Any) -> Any:
-        ...
+    async def pop(self, key: Any) -> Any: ...
 
     async def pop(self, key: Any) -> dict[str, Any]:
         """Pops a key from the store.
@@ -247,12 +240,10 @@ class DBStore:
         return data
 
     @overload
-    async def set(self, key: tuple[Any, ...], value: dict[str, Any]) -> None:
-        ...
+    async def set(self, key: tuple[Any, ...], value: dict[str, Any]) -> None: ...
 
     @overload
-    async def set(self, key: Any, value: dict[str, Any]) -> None:
-        ...
+    async def set(self, key: Any, value: dict[str, Any]) -> None: ...
 
     async def set(self, key: Any, value: dict[str, Any]) -> None:
         """Updates a key's value.
@@ -288,12 +279,10 @@ class DBStore:
                 await conn.execute(query, *values)
 
     @overload
-    async def update(self, mapping: dict[tuple[Any, ...], dict[str, Any]]) -> None:
-        ...
+    async def update(self, mapping: dict[tuple[Any, ...], dict[str, Any]]) -> None: ...
 
     @overload
-    async def update(self, mapping: dict[Any, dict[str, Any]]) -> None:
-        ...
+    async def update(self, mapping: dict[Any, dict[str, Any]]) -> None: ...
 
     async def update(self, mapping: dict[Any, dict[str, Any]]) -> None:
         """Bulk updates the store with a mapping.
@@ -317,12 +306,10 @@ class DBStore:
             await self.set(key, value)
 
     @overload
-    async def delete(self, key: tuple[Any, ...]) -> None:
-        ...
+    async def delete(self, key: tuple[Any, ...]) -> None: ...
 
     @overload
-    async def delete(self, key: Any) -> None:
-        ...
+    async def delete(self, key: Any) -> None: ...
 
     async def delete(self, key: Any) -> None:
         """Delets a key from the store.
