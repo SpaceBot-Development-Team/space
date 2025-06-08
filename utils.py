@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -28,9 +29,7 @@ import datetime
 import discord
 from discord.ext import commands
 
-__slots__ = (
-    'format_dt',
-)
+__slots__ = ('format_dt',)
 
 
 def format_td(td: datetime.timedelta) -> str:
@@ -58,7 +57,8 @@ def format_td(td: datetime.timedelta) -> str:
             f'{seconds} second{"s" if seconds != 1 else ""}',
         )
     return discord.utils._human_join(
-        fmts, final='and',
+        fmts,
+        final='and',
     )
 
 
@@ -68,4 +68,5 @@ def has_permissions(**perms: bool):
         commands.check_any(commands.has_guild_permissions(**perms), commands.is_owner())(cmd)
         discord.app_commands.default_permissions(**perms)(cmd)
         return cmd
+
     return decorator

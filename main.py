@@ -83,7 +83,7 @@ if __name__ == "__main__":
             debug_webhook_url=os.environ["DEBUG_WEBHOOK_URL"],
         ) as bot:
             async with asyncpg.create_pool(
-                #os.environ['DB_URI'].format(os.environ['DB_PASSWORD']),
+                # os.environ['DB_URI'].format(os.environ['DB_PASSWORD']),
                 user=os.environ["db_user"],
                 host=os.environ["db_host"],
                 port=int(os.environ["db_port"]),
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                     await bot.send_debug_message(
                         embed=discord.Embed(
                             title='Error When Booting Up Bot!',
-                            description=f'```py\n{traceback.format_exception(type(exc), exc, exc.__traceback__)[:3996]}```'
+                            description=f'```py\n{traceback.format_exception(type(exc), exc, exc.__traceback__)[:3996]}```',
                         )
                     )
 

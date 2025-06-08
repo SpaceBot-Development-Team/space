@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from discord.ext import commands
@@ -43,8 +44,7 @@ class BadDuration(commands.BadArgument):
 
 
 class BadWinnersArgument(commands.BadArgument):
-    """Error raised when, in a giveaway, a bad winners amount is provided.
-    """
+    """Error raised when, in a giveaway, a bad winners amount is provided."""
 
     __slots__ = ()
 

@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -32,9 +33,7 @@ from .core import DBStore
 if TYPE_CHECKING:
     from bot import LegacyBot
 
-__all__ = (
-    'ClaimtimeDBStore',
-)
+__all__ = ('ClaimtimeDBStore',)
 
 
 class ClaimtimeDBStore(DBStore):
@@ -76,7 +75,9 @@ class ClaimtimeDBStore(DBStore):
         base = 0
         roles = [r.id for r in member.roles]
 
-        for role, claimtime in sorted(config['roles'].items(), key=lambda r: member._roles.index(int(r[0])) if int(r[0]) in member._roles else -1):
+        for role, claimtime in sorted(
+            config['roles'].items(), key=lambda r: member._roles.index(int(r[0])) if int(r[0]) in member._roles else -1
+        ):
             if int(role) in roles:
                 if not claimtime['override']:
                     base += claimtime['time']

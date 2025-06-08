@@ -175,3 +175,6 @@ cython_debug/
 
 # Configuration files
 *.config
+
+# SSH
+space-bot*

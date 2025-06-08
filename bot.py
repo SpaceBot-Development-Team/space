@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -44,14 +45,14 @@ MISSING: Any = discord.utils.MISSING
 PREMIUM_SKU_ID: Final[int] = 1256218013930094682
 log = logging.getLogger(__name__)
 
+
 class LegacyBotContext(commands.Context["LegacyBot"]):
-    __slots__ = (
-        '_cs_premium',
-    )
+    __slots__ = ('_cs_premium',)
 
     guild: discord.Guild
+    me: discord.Member
     author: discord.Member
-    channel: discord.TextChannel | discord.VoiceChannel | discord.StageChannel | discord.ForumChannel
+    channel: discord.TextChannel | discord.VoiceChannel | discord.StageChannel | discord.Thread
 
     @property
     def reference(self) -> discord.MessageReference | None:
@@ -61,7 +62,9 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
     @property
     def resolved_reference(self) -> discord.Message | None:
         """:class:`discord.Message`: The resolved reference message, or ``None``."""
-        return self.reference and (self.reference.resolved or self.reference.cached_message)  # pyright: ignore[reportReturnType]
+        return self.reference and (
+            self.reference.resolved or self.reference.cached_message
+        )  # pyright: ignore[reportReturnType]
 
     @property
     def session(self) -> aiohttp.ClientSession:
@@ -103,13 +106,21 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
             return self._cs_premium
 
         if self.interaction:
-            prem = (
-                (PREMIUM_SKU_ID in [e.sku_id for e in self.interaction.entitlements])
-                or
-                (PREMIUM_SKU_ID in self.interaction.entitlement_sku_ids)
+            prem = (PREMIUM_SKU_ID in [e.sku_id for e in self.interaction.entitlements]) or (
+                PREMIUM_SKU_ID in self.interaction.entitlement_sku_ids
             )
         else:
-            prem = len([_ async for _ in self.bot.entitlements(user=self.author, guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)])]) > 0
+            prem = (
+                len(
+                    [
+                        _
+                        async for _ in self.bot.entitlements(
+                            user=self.author, guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)]
+                        )
+                    ]
+                )
+                > 0
+            )
 
         self._cs_premium = prem
         return self._cs_premium
@@ -267,7 +278,8 @@ class LegacyBot(commands.Bot):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE guilds SET disabled_modules = $1::text[] WHERE "id" = $2;',
-                    disabled_modules, guild_id,
+                    disabled_modules,
+                    guild_id,
                 )
 
         self._disabled_modules[guild_id] = disabled_modules
@@ -284,7 +296,8 @@ class LegacyBot(commands.Bot):
                     'WITH inserted AS '
                     '(INSERT INTO guilds ("id", prefixes) VALUES ($1, $2::varchar[]) ON CONFLICT ("id") DO NOTHING RETURNING prefixes) '
                     'SELECT prefixes FROM inserted UNION ALL SELECT prefixes FROM guilds WHERE "id" = $1 LIMIT 1;',
-                    guild_id, ['?'],
+                    guild_id,
+                    ['?'],
                 )
 
                 if data is None:
@@ -409,8 +422,7 @@ class LegacyBot(commands.Bot):
                     guild.id,
                 )
                 await conn.execute(
-                    'INSERT INTO claimtimes_config (guild_id) VALUES ($1) ON CONFLICT (id) DO NOTHING;',
-                    guild.id
+                    'INSERT INTO claimtimes_config (guild_id) VALUES ($1) ON CONFLICT (id) DO NOTHING;', guild.id
                 )
         # ensure context manager closure
         pass
@@ -455,17 +467,13 @@ class LegacyBot(commands.Bot):
             embed.description = f'You need the {r} role to execute this command!'
         elif isinstance(error, commands.BotMissingPermissions):
             fmt = discord.utils._human_join(
-                [m.replace('_', ' ').replace('guild', 'server').title()
-                 for m in error.missing_permissions
-                ],
+                [m.replace('_', ' ').replace('guild', 'server').title() for m in error.missing_permissions],
                 final='and',
             )
             embed.description = f'I need {fmt} permissions to execute this command!'
         elif isinstance(error, commands.MissingPermissions):
             fmt = discord.utils._human_join(
-                [m.replace('_', ' ').replace('guild', 'server').title()
-                 for m in error.missing_permissions
-                ],
+                [m.replace('_', ' ').replace('guild', 'server').title() for m in error.missing_permissions],
                 final='and',
             )
             embed.description = f'You need {fmt} permissions to execute this command!'
@@ -504,7 +512,9 @@ class LegacyBot(commands.Bot):
         elif isinstance(error, commands.ThreadNotFound):
             embed.description = f'Thread with name or ID "{error.argument}" was not found!'
         elif isinstance(error, commands.ChannelNotReadable):
-            embed.description = f'I do not have Read Messages permissions on {error.argument.mention}, and I need it to execute the command!'
+            embed.description = (
+                f'I do not have Read Messages permissions on {error.argument.mention}, and I need it to execute the command!'
+            )
         elif isinstance(error, commands.ChannelNotFound):
             embed.description = f'Channel with name or ID "{error.argument}" was not found!'
         elif isinstance(error, commands.UserNotFound):
@@ -537,7 +547,9 @@ class LegacyBot(commands.Bot):
         elif isinstance(error, commands.PrivateMessageOnly):
             embed.description = 'This command can only be used on private messages!'
         elif isinstance(error, commands.BadLiteralArgument):
-            embed.description = f'"{error.argument}" is not a valid choice available in {discord.utils._human_join(error.literals)}'
+            embed.description = (
+                f'"{error.argument}" is not a valid choice available in {discord.utils._human_join(error.literals)}'
+            )
         elif isinstance(error, commands.BadUnionArgument):
             embed.description = f'"{error.param.name}" value was not valid!'
         elif isinstance(error, commands.ExpectedClosingQuoteError):
@@ -550,7 +562,9 @@ class LegacyBot(commands.Bot):
             embed.description = 'You are missing one attachment to execute this command!'
         elif isinstance(error, commands.MissingRequiredArgument):
             assert context.command
-            embed.description = f'`{error.param.name}` is missing! Make sure you follow the command syntax: `{context.command.signature}`'
+            embed.description = (
+                f'`{error.param.name}` is missing! Make sure you follow the command syntax: `{context.command.signature}`'
+            )
         elif isinstance(error, ModuleDisabled):
             embed.description = str(error)
         else:
@@ -563,7 +577,7 @@ class LegacyBot(commands.Bot):
         if send_debug_log:
             await self.send_debug_message(
                 embed=discord.Embed(
-                    title=f'An unknown error occurred on {context.command.name}',
+                    title=f'An unknown error occurred on {context.command.name if context.command else "a non-command context"}',
                     description=f'Executed by: {context.author} ({context.author.id})\nExecution date: {discord.utils.format_dt(context.created_at)}',
                     colour=discord.Colour.red(),
                 ).add_field(

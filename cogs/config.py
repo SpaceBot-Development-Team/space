@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -51,27 +52,33 @@ if TYPE_CHECKING:
         messages_enabled: bool
         disabled_modules: list[str]
 
+
 PREMIUM_SKU_ID = 1256218013930094682
 DURATION_REGEX = re.compile(r'(\d{1,5}(?:[.,]?\d{1,5})?)([smhd])')
 
 
 def replace_greet_message_vars(string: str, member: discord.Member) -> str:
-    return string.replace(
-        "{mention}",
-        member.mention,
-    ).replace(
-        "{mc}",
-        str(
-            member.guild.member_count
-            or member.guild.approximate_member_count
-            or len(member.guild.members)
-        ),
-    ).replace(
-        '{server_name}', member.guild.name,
-    ).replace(
-        '{member(tag)}', member.name,
-    ).replace(
-        '{member(name)}', member.display_name,
+    return (
+        string.replace(
+            "{mention}",
+            member.mention,
+        )
+        .replace(
+            "{mc}",
+            str(member.guild.member_count or member.guild.approximate_member_count or len(member.guild.members)),
+        )
+        .replace(
+            '{server_name}',
+            member.guild.name,
+        )
+        .replace(
+            '{member(tag)}',
+            member.name,
+        )
+        .replace(
+            '{member(name)}',
+            member.display_name,
+        )
     )
 
 
@@ -198,7 +205,8 @@ class ConfigViewPrefixesActionRow(discord.ui.ActionRow['ConfigView']):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE guilds SET prefixes = $1::varchar[] WHERE "id" = $2;',
-                    self.view.record['prefixes'], interaction.guild_id,
+                    self.view.record['prefixes'],
+                    interaction.guild_id,
                 )
 
         interaction.client._guild_prefixes[interaction.guild_id] = self.view.record['prefixes']
@@ -237,7 +245,8 @@ class ConfigViewGreetActionRow(discord.ui.ActionRow['ConfigView']):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE guilds SET greets = $1::jsonb WHERE "id" = $2;',
-                    self.view.record['greets'], interaction.guild_id,
+                    self.view.record['greets'],
+                    interaction.guild_id,
                 )
 
         await interaction.edit_original_response(view=self.view.update_self())
@@ -284,7 +293,8 @@ class ConfigViewGreetActionRow(discord.ui.ActionRow['ConfigView']):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE guilds SET greets = $1::jsonb WHERE "id" = $2;',
-                    self.view.record['greets'], interaction.guild_id,
+                    self.view.record['greets'],
+                    interaction.guild_id,
                 )
 
         await interaction.edit_original_response(view=self.view.update_self())
@@ -312,7 +322,7 @@ class ConfigView(discord.ui.LayoutView):
         if prefixes is None:
             prefixes = self.record['prefixes'] = ['?']
 
-        super().__init__(timeout=60*15)  # 15 minutes
+        super().__init__(timeout=60 * 15)  # 15 minutes
 
         self.info_container = discord.ui.Container(accent_colour=discord.Colour.blurple())
         self.prefixes_action_row = ConfigViewPrefixesActionRow()
@@ -328,7 +338,7 @@ class ConfigView(discord.ui.LayoutView):
     async def on_timeout(self) -> None:
         for child in self.walk_children():
             if hasattr(child, 'disabled'):
-                child.disabled = True
+                child.disabled = True  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.message:
             await self.message.edit(view=self)
@@ -359,10 +369,12 @@ class ConfigView(discord.ui.LayoutView):
         return ret
 
     def construct_buy_premium_view(self) -> discord.ui.View:
-        return discord.ui.View(timeout=.1).add_item(discord.ui.Button(sku_id=PREMIUM_SKU_ID))
+        return discord.ui.View(timeout=0.1).add_item(discord.ui.Button(sku_id=PREMIUM_SKU_ID))
 
     def update_premium(self, interaction: Interaction):
-        self.premium = (PREMIUM_SKU_ID in interaction.entitlement_sku_ids) or (discord.utils.get(interaction.entitlements, sku_id=PREMIUM_SKU_ID) is not None)
+        self.premium = (PREMIUM_SKU_ID in interaction.entitlement_sku_ids) or (
+            discord.utils.get(interaction.entitlements, sku_id=PREMIUM_SKU_ID) is not None
+        )
 
     def update_self(self) -> 'ConfigView':
         self.clear_items()
@@ -389,18 +401,13 @@ class ConfigView(discord.ui.LayoutView):
         # -- prefixes --
         self.info_container.add_item(
             discord.ui.TextDisplay(
-                (
-                    f'# Server Config\n\n'
-                    f'**Prefixes:** {", ".join(f"``{pre}``" for pre in self.record["prefixes"])}'
-                ),
+                (f'# Server Config\n\n' f'**Prefixes:** {", ".join(f"``{pre}``" for pre in self.record["prefixes"])}'),
             ),
         )
         self.info_container.add_item(
             self.prefixes_action_row,
         )
-        self.info_container.add_item(
-            discord.ui.Separator(visible=True, spacing=discord.SeparatorSize.small)
-        )
+        self.info_container.add_item(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
 
         # -- greet --
         self.info_container.add_item(
@@ -415,9 +422,7 @@ class ConfigView(discord.ui.LayoutView):
         self.info_container.add_item(
             discord.ui.ActionRow(ModifyGreetChannelsSelect(greets.keys(), self.premium)),
         )
-        self.info_container.add_item(
-            discord.ui.Separator(visible=True, spacing=discord.SeparatorSize.small)
-        )
+        self.info_container.add_item(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
 
         # -- modules --
 
@@ -495,10 +500,7 @@ class ModifyGreetChannelsSelect(discord.ui.ChannelSelect['ConfigView']):
                 discord.ChannelType.private_thread,
                 discord.ChannelType.voice,
             ],
-            default_values=[
-                discord.SelectDefaultValue.from_channel(discord.Object(int(c)))
-                for c in default_channels
-            ],
+            default_values=[discord.SelectDefaultValue.from_channel(discord.Object(int(c))) for c in default_channels],
             min_values=0,
             max_values=10 if premium else 5,
         )
@@ -522,7 +524,8 @@ class ModifyGreetChannelsSelect(discord.ui.ChannelSelect['ConfigView']):
             async with conn.transaction():
                 await conn.execute(
                     'UPDATE guilds SET greets = $1::jsonb WHERE "id" = $2;',
-                    self.view.record['greets'], interaction.guild_id,
+                    self.view.record['greets'],
+                    interaction.guild_id,
                 )
 
         await interaction.edit_original_response(view=self.view.update_self())
@@ -571,14 +574,16 @@ class GConfigView(discord.ui.View):
         'message',
     )
 
-    def __init__(self, claimtime: asyncpg.Record, *, premium: bool, author: discord.abc.Snowflake, bot: LegacyBot, guild_id: int) -> None:
+    def __init__(
+        self, claimtime: asyncpg.Record, *, premium: bool, author: discord.abc.Snowflake, bot: LegacyBot, guild_id: int
+    ) -> None:
         self.claimtime: dict[str, Any] = dict(claimtime)
         self.premium: bool = premium
         self.author: discord.abc.Snowflake = author
         self.message: discord.Message | None = None
         self.bot: LegacyBot = bot
         self.guild_id: int = guild_id
-        super().__init__(timeout=60*15)
+        super().__init__(timeout=60 * 15)
 
         if claimtime["winmsg_enabled"] is True:
             self.enable_win_message.label = 'Disable'
@@ -587,7 +592,7 @@ class GConfigView(discord.ui.View):
     async def on_timeout(self) -> None:
         for child in self.walk_children():
             if hasattr(child, 'disabled'):
-                child.disabled = True
+                child.disabled = True  # pyright: ignore[reportAttributeAccessIssue]
 
         if self.message:
             await self.message.edit(view=self)
@@ -620,7 +625,10 @@ class GConfigView(discord.ui.View):
             embed.add_field(
                 name='Claimtimes:',
                 value='\n'.join(
-                    [f'<@&{role_id}>: {claimtime["time"]:.2f} seconds | Override: {claimtime["override"]}' for role_id, claimtime in self.claimtime["roles"].items()],
+                    [
+                        f'<@&{role_id}>: {claimtime["time"]:.2f} seconds | Override: {claimtime["override"]}'
+                        for role_id, claimtime in self.claimtime["roles"].items()
+                    ],
                 ),
             )
         return embed
@@ -646,7 +654,8 @@ class GConfigView(discord.ui.View):
             async with conn.transaction():
                 await conn.execute(
                     'INSERT INTO claimtimes_config (guild_id, win_message) VALUES ($1, $2) ON CONFLICT (guild_id) DO UPDATE SET win_message = EXCLUDED.win_message;',
-                    interaction.guild_id, self.claimtime["win_message"]
+                    interaction.guild_id,
+                    self.claimtime["win_message"],
                 )
 
         await interaction.client.claimtime_store.load()
@@ -676,7 +685,8 @@ class GConfigView(discord.ui.View):
             async with conn.transaction():
                 await conn.execute(
                     'INSERT INTO claimtimes_config (guild_id, winmsg_enabled) VALUES ($1, $2) ON CONFLICT (guild_id) DO UPDATE SET winmsg_enabled = EXCLUDED.winmsg_enabled;',
-                    interaction.guild_id, self.claimtime["winmsg_enabled"],
+                    interaction.guild_id,
+                    self.claimtime["winmsg_enabled"],
                 )
 
         await interaction.client.claimtime_store.load()
@@ -764,7 +774,8 @@ class SelectRemoveClaimtimeRoleView(discord.ui.View):
             async with conn.transaction():
                 await conn.execute(
                     'INSERT INTO claimtimes_config (guild_id, roles) VALUES ($1, $2::jsonb) ON CONFLICT (guild_id) DO UPDATE SET roles = EXCLUDED.roles;',
-                    guild_id, self.roles,
+                    guild_id,
+                    self.roles,
                 )
 
         await interaction.edit_original_response(
@@ -813,16 +824,12 @@ class SelectClaimtimeRoleView(discord.ui.View):
         await msg.delete()
 
         if msg.content.lower() == 'cancel':
-            await interaction.edit_original_response(
-                content='Cancelled.'
-            )
+            await interaction.edit_original_response(content='Cancelled.')
             return
 
         matches = DURATION_REGEX.findall(msg.content.lower())
         if not matches or len(matches) > 1:
-            await interaction.edit_original_response(
-                content='Invalid duration provided!'
-            )
+            await interaction.edit_original_response(content='Invalid duration provided!')
             return
 
         time, fmt = matches[0]
@@ -836,7 +843,7 @@ class SelectClaimtimeRoleView(discord.ui.View):
             msg = await interaction.client.wait_for(
                 'message',
                 check=lambda m: m.author.id == interaction.user.id and m.channel.id == interaction.channel_id,
-                timeout=60.0
+                timeout=60.0,
             )
         except asyncio.TimeoutError:
             await interaction.edit_original_response(
@@ -852,9 +859,7 @@ class SelectClaimtimeRoleView(discord.ui.View):
         elif low in ('no', 'n', 'false', 'f', '0', 'disable', 'off'):
             ret = False
         else:
-            await interaction.edit_original_response(
-                content='Invalid response provided! Defaulting to ``False``.'
-            )
+            await interaction.edit_original_response(content='Invalid response provided! Defaulting to ``False``.')
             ret = False
 
         self.parent.claimtime["roles"][str(select.values[0].id)] = {"time": value, "override": ret}
@@ -863,7 +868,8 @@ class SelectClaimtimeRoleView(discord.ui.View):
             async with conn.transaction():
                 await conn.execute(
                     'INSERT INTO claimtimes_config (guild_id, roles) VALUES ($1, $2::jsonb) ON CONFLICT (guild_id) DO UPDATE SET roles = EXCLUDED.roles;',
-                    interaction.guild_id, self.parent.claimtime["roles"],
+                    interaction.guild_id,
+                    self.parent.claimtime["roles"],
                 )
         await interaction.client.claimtime_store.load()
 
@@ -919,10 +925,7 @@ class Configuration(commands.Cog):
     async def insert_guild_config(self, guild: discord.Guild) -> asyncpg.Record:
         async with self.bot.get_connection() as conn:
             async with conn.transaction():
-                row = await conn.fetchrow(
-                    'INSERT INTO guilds ("id") VALUES ($1) RETURNING *;',
-                    guild.id
-                )
+                row = await conn.fetchrow('INSERT INTO guilds ("id") VALUES ($1) RETURNING *;', guild.id)
         if row is None:
             raise RuntimeError('row returned none')
         return row
@@ -1029,6 +1032,7 @@ class Configuration(commands.Cog):
 
 async def setup(bot: LegacyBot) -> None:
     await bot.add_cog(Configuration(bot))
+
 
 async def teardown(bot: LegacyBot) -> None:
     await bot.remove_cog(Configuration.__cog_name__)

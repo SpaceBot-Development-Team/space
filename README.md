@@ -9,5 +9,4 @@ through [this link](https://discord.com/api/oauth2/authorize?client_id=118850123
 
 # Contributing to Development
 
-The only requirement is to have a good understanding of Python and **know what you are writing, meaning that any attempt to create a vulnerability, joke changes, or anything that does not benefit**  
-**the bot will result in a contribution ban**.
+For more information on how to contribute, look at [CONTRIBUTING.md](/.github/CONTRIBUTING.md)

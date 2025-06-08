@@ -1,0 +1,44 @@
+name: Lint
+
+on:
+    push:
+    pull_request:
+        types: [ opened, reopened, synchronize ]
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+
+        name: check
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                fetch-depth: 0
+
+            - name: Set up CPython
+              uses: actions/setup-python@v4
+              with:
+                python-version: '3.12'
+
+            - name: Install dependencies
+              id: install-deps
+              run: |
+                python -m pip install --upgrade pip setuptools wheel black==25.1.0 requests
+                pip install -U -r requirements.txt
+
+            - name: Setup node.js
+              uses: actions/setup-node@v3
+              with:
+                node-version: '16'
+
+            - name: Run PyRight
+              uses: jakebailey/pyright-action@v1
+              with:
+                version: '1.1.394'
+                warnings: false
+                no-comments: true
+
+            - name: Run Black
+              if: ${{ always() && steps.install-deps.outcome == 'success' }}
+              run: |
+                black --check cogs store bot.py errors.py main.py paginator.py utils.py

@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
+
 from __future__ import annotations
 
 import traceback
@@ -87,7 +88,7 @@ class Paginator(discord.ui.View):
 
     def fill_items(self) -> None:
         if not self.compact:
-            self.numbered_page.row =  1
+            self.numbered_page.row = 1
             self.stop_pages.row = 1
 
         if self.source.is_paginating():
@@ -105,9 +106,7 @@ class Paginator(discord.ui.View):
             self.add_item(self.stop_pages)
 
     async def _get_kwargs_from_page(self, page: int) -> dict[str, Any]:
-        value = await discord.utils.maybe_coroutine(
-            self.source.format_page, self, page
-        )
+        value = await discord.utils.maybe_coroutine(self.source.format_page, self, page)
 
         if isinstance(value, dict):
             return value
@@ -135,12 +134,8 @@ class Paginator(discord.ui.View):
         self.go_to_first_page.disabled = page_number == 0
         if self.compact:
             max_pages = self.source.get_max_pages()
-            self.go_to_last_page.disabled = (
-                max_pages is None or (page_number + 1) >= max_pages
-            )
-            self.go_to_next_page.disabled = (
-                max_pages is not None and (page_number + 1) >= max_pages
-            )
+            self.go_to_last_page.disabled = max_pages is None or (page_number + 1) >= max_pages
+            self.go_to_next_page.disabled = max_pages is not None and (page_number + 1) >= max_pages
             self.go_to_previous_page.disabled = page_number == 0
             return
 
@@ -162,7 +157,9 @@ class Paginator(discord.ui.View):
                 self.go_to_previous_page.label = "…"
 
     async def show_checked_page(
-        self, interaction: discord.Interaction, page_number: int,
+        self,
+        interaction: discord.Interaction,
+        page_number: int,
     ) -> None:
         max_pages = self.source.get_max_pages()
 
@@ -209,7 +206,9 @@ class Paginator(discord.ui.View):
             )
 
     async def start(self, *, content: str | None = None, ephemeral: bool = False) -> None:
-        if self.check_embeds and not self.ctx.channel.permissions_for(self.ctx.me).embed_links:  # pyright: ignore[reportArgumentType]
+        if (
+            self.check_embeds and not self.ctx.channel.permissions_for(self.ctx.me).embed_links
+        ):  # pyright: ignore[reportArgumentType]
             await self.ctx.send(
                 'I donnot have Embed Links permissions!',
                 ephemeral=True,
@@ -226,44 +225,32 @@ class Paginator(discord.ui.View):
         self.message = await self.ctx.send(**kwargs, view=self, ephemeral=ephemeral)
 
     @discord.ui.button(label="≪", style=discord.ButtonStyle.grey)
-    async def go_to_first_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def go_to_first_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         """go to the first page"""
         await self.show_page(interaction, 0)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.blurple)
-    async def go_to_previous_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def go_to_previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         """go to the previous page"""
         await self.show_checked_page(interaction, self.current_page - 1)
 
     @discord.ui.button(label="Current", style=discord.ButtonStyle.grey, disabled=True)
-    async def go_to_current_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def go_to_current_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         pass
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
-    async def go_to_next_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def go_to_next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         """go to the next page"""
         await self.show_checked_page(interaction, self.current_page + 1)
 
     @discord.ui.button(label="≫", style=discord.ButtonStyle.grey)
-    async def go_to_last_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def go_to_last_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         """go to the last page"""
         # The call here is safe because it's guarded by skip_if
         await self.show_page(interaction, self.source.get_max_pages() - 1)  # type: ignore
 
     @discord.ui.button(label="Go To Page", style=discord.ButtonStyle.grey)
-    async def numbered_page(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def numbered_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         """lets you type a page number to go to"""
         if self.message is None:
             return
@@ -276,16 +263,12 @@ class Paginator(discord.ui.View):
             await interaction.followup.send("You took too much!", ephemeral=True)
             return
         elif self.is_finished():
-            await modal.interaction.response.send_message(
-                "You took too much!", ephemeral=True
-            )
+            await modal.interaction.response.send_message("You took too much!", ephemeral=True)
             return
 
         value = str(modal.page.value)
         if not value.isdigit():
-            await modal.interaction.response.send_message(
-                f"Expected a number, not {value!r}", ephemeral=True
-            )
+            await modal.interaction.response.send_message(f"Expected a number, not {value!r}", ephemeral=True)
             return
 
         value = int(value)
@@ -295,9 +278,7 @@ class Paginator(discord.ui.View):
             await modal.interaction.response.send_message(error, ephemeral=True)
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.red)
-    async def stop_pages(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def stop_pages(self, interaction: discord.Interaction, button: discord.ui.Button):
         """stops the pagination session."""
         await interaction.response.defer()
         await interaction.delete_original_response()
@@ -320,9 +301,7 @@ class FieldPageSource(menus.ListPageSource):
         self.clear_description: bool = clear_description
         self.inline: bool = inline
 
-    async def format_page(  # type: ignore
-        self, menu: Paginator, entries: list[tuple[Any, Any]]
-    ) -> discord.Embed:
+    async def format_page(self, menu: Paginator, entries: list[tuple[Any, Any]]) -> discord.Embed:  # type: ignore
         self.embed.clear_fields()
         if self.clear_description:
             self.embed.description = None

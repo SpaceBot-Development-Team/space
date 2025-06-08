@@ -52,9 +52,7 @@ class GroupHelpPageSource(menus.ListPageSource):
         self.title: str = f"Commands in `{self.group.qualified_name}`"
         self.description: str = self.group.description
 
-    async def format_page(  # type: ignore
-        self, menu: Paginator, commands: list[commands.HybridCommand]
-    ) -> discord.Embed:
+    async def format_page(self, menu: Paginator, commands: list[commands.HybridCommand]) -> discord.Embed:  # type: ignore
         embed = discord.Embed(
             title=self.title,
             description=self.description,
@@ -72,20 +70,14 @@ class GroupHelpPageSource(menus.ListPageSource):
         maximum = self.get_max_pages()
 
         if maximum > 1:
-            embed.set_author(
-                name=f"Page {menu.current_page + 1}/{maximum} ({len(self.entries)} commands)"
-            )
+            embed.set_author(name=f"Page {menu.current_page + 1}/{maximum} ({len(self.entries)} commands)")
 
-        embed.set_footer(
-            text=f'Use "{self.prefix}help <command>" for more information on a command.'
-        )
+        embed.set_footer(text=f'Use "{self.prefix}help <command>" for more information on a command.')
         return embed
 
 
 class HelpSelectMenu(discord.ui.Select["HelpMenu"]):
-    def __init__(
-        self, entries: dict[commands.Cog, list[commands.HybridCommand]], bot: LegacyBot
-    ):
+    def __init__(self, entries: dict[commands.Cog, list[commands.HybridCommand]], bot: LegacyBot):
         super().__init__(
             placeholder="Choose a category...",
             min_values=1,
@@ -123,9 +115,7 @@ class HelpSelectMenu(discord.ui.Select["HelpMenu"]):
         else:
             cog = self.bot.get_cog(value)
             if cog is None:
-                await interaction.response.send_message(
-                    "This category somehow does not exist!", ephemeral=True
-                )
+                await interaction.response.send_message("This category somehow does not exist!", ephemeral=True)
                 return
 
             commands = self.commands[cog]
@@ -136,9 +126,7 @@ class HelpSelectMenu(discord.ui.Select["HelpMenu"]):
                 )
                 return
 
-            source = GroupHelpPageSource(
-                cog, commands, prefix=self.view.ctx.clean_prefix
-            )
+            source = GroupHelpPageSource(cog, commands, prefix=self.view.ctx.clean_prefix)
             await self.view.rebind(source, interaction)
 
 
@@ -225,16 +213,12 @@ class HelpMenu(Paginator):
     def __init__(self, source: menus.PageSource, ctx: Context):
         super().__init__(source, context=ctx, compact=True)
 
-    def add_categories(
-        self, commands: dict[commands.Cog, list[commands.HybridCommand]]
-    ) -> None:
+    def add_categories(self, commands: dict[commands.Cog, list[commands.HybridCommand]]) -> None:
         self.clear_items()
         self.add_item(HelpSelectMenu(commands, self.ctx.bot))
         self.fill_items()
 
-    async def rebind(
-        self, source: menus.PageSource, interaction: discord.Interaction
-    ) -> None:
+    async def rebind(self, source: menus.PageSource, interaction: discord.Interaction) -> None:
         self.source = source
         self.current_page = 0
 
@@ -252,9 +236,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
     def __init__(self):
         super().__init__(
             command_attrs={
-                "cooldown": commands.CooldownMapping.from_cooldown(
-                    1, 3.0, commands.BucketType.member
-                ),
+                "cooldown": commands.CooldownMapping.from_cooldown(1, 3.0, commands.BucketType.member),
                 "help": "Shows a command, group or category help",
             }
         )
@@ -262,10 +244,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
     async def on_help_command_error(self, ctx: Context, error: commands.CommandError):  # type: ignore
         if isinstance(error, commands.CommandInvokeError):
             # Ignore missing permission errors
-            if (
-                isinstance(error.original, discord.HTTPException)
-                and error.original.code == 50013
-            ):
+            if isinstance(error.original, discord.HTTPException) and error.original.code == 50013:
                 return
 
             await ctx.send(str(error.original))
@@ -350,9 +329,7 @@ class PaginatedHelpCommand(commands.HelpCommand):
         else:
             embed_like.description = command.help or "No short help"
 
-    async def send_command_help(  # type: ignore
-        self, command: commands.HybridCommand | commands.HybridGroup
-    ):
+    async def send_command_help(self, command: commands.HybridCommand | commands.HybridGroup):  # type: ignore
         # No pagination necessary for a single command.
         embed = discord.Embed(colour=discord.Colour.blurple())
         self.common_command_formatting(embed, command)
@@ -377,14 +354,14 @@ class ShowVarsView(discord.ui.View):
     def __init__(self, author: discord.abc.User) -> None:
         self.author: discord.abc.User = author
         self.message: discord.Message | None = None
-        super().__init__(timeout=60*15)
+        super().__init__(timeout=60 * 15)
 
     def enable_all(self) -> None:
         for child in self.children:
             if hasattr(child, 'disabled'):
-                child.disabled = False
+                child.disabled = False  # pyright: ignore[reportAttributeAccessIssue]
             if hasattr(child, 'style'):
-                child.style = discord.ButtonStyle.blurple
+                child.style = discord.ButtonStyle.blurple  # pyright: ignore[reportAttributeAccessIssue]
 
     async def on_timeout(self) -> None:
         if self.message:
@@ -400,14 +377,18 @@ class ShowVarsView(discord.ui.View):
         embed.add_field(
             name='\u200b',
             value='- `{claim_time}` - The amount of seconds the winner (e.g.: 10 seconds)\n'
-            '- `{host(username)}` - The giveaway host username (e.g.: ' f'{self.author.name})\n'
-            '- `{host(mention)}` - The giveaway host mention (e.g.: ' f'{self.author.mention})\n'
-            '- `{winner(username)}` - The giveaway winner username (e.g.: ' f'{self.author.name})\n'
-            '- `{winner(mention)}` - The giveaway winner mention (e.g.: ' f'{self.author.mention})\n'
+            '- `{host(username)}` - The giveaway host username (e.g.: '
+            f'{self.author.name})\n'
+            '- `{host(mention)}` - The giveaway host mention (e.g.: '
+            f'{self.author.mention})\n'
+            '- `{winner(username)}` - The giveaway winner username (e.g.: '
+            f'{self.author.name})\n'
+            '- `{winner(mention)}` - The giveaway winner mention (e.g.: '
+            f'{self.author.mention})\n'
             '- `{winner(created_ago)}` - When was the winner account created, in relative (e.g.: `2 years ago`)\n'
             '- `{winner(created_date)}` - When was the winner account created, in full date (e.g.: `17 May 2016 22:57`)\n'
             '- `{winner(joined_ago)}` - When the winner joined the server, in relative (e.g.: `3 months ago`)\n'
-            '- `{winner(joined_date)}` - When the winner joined the server, in full date (e.g.: `20 May 2016 11:43`)'
+            '- `{winner(joined_date)}` - When the winner joined the server, in full date (e.g.: `20 May 2016 11:43`)',
         )
         return embed
 
@@ -421,8 +402,10 @@ class ShowVarsView(discord.ui.View):
         embed.add_field(
             name='\u200b',
             value='- `{prize}` - The giveaway prize\n'
-            '- `{host(username)}` - The giveaway host username (e.g: ' f'{self.author.name})\n'
-            '- `{host(mention)}` - The giveaway host mention (e.g.: ' f'{self.author.mention})\n'
+            '- `{host(username)}` - The giveaway host username (e.g: '
+            f'{self.author.name})\n'
+            '- `{host(mention)}` - The giveaway host mention (e.g.: '
+            f'{self.author.mention})\n'
             '- `{time_left}` - The remaining time until the giveaway ends, or how much time ended (e.g.: `in 10 minutes`/`10 minutes ago`)\n'
             '- `{end_time}` - The date when the giveaway will end (e.g.: `Tuesday, 17 May 2016 22:57`)\n'
             '- `{num_winners}` - The amount of winners of the giveaway (e.g.: `1`)\n'
@@ -431,7 +414,7 @@ class ShowVarsView(discord.ui.View):
             '- `{server_name}` - The server name.\n'
             '- `{winner_list}` - The giveaway winners, or `Not decided` if they have not yet been decided.\n'
             '- `{winners}` - It will work as `{num_winners}` if the giveaway has not ended and no winners are decided, when winners are decided, '
-            'it works as `{winner_list}`.'
+            'it works as `{winner_list}`.',
         )
         return embed
 
@@ -443,23 +426,31 @@ class ShowVarsView(discord.ui.View):
         )
         embed.add_field(
             name='\u200b',
-            value='- `{mention}` - The member mention (e.g.: ' f'{self.author.mention})\n'
+            value='- `{mention}` - The member mention (e.g.: '
+            f'{self.author.mention})\n'
             '- `{mc}` - The server member count (e.g.: 1)\n'
-            '- `{server(name)}` - The server name (e.g.: ' f'{server_name})\n'
-            '- `{member(tag)}` - The member username (e.g: ' f'{self.author.name})\n'
-            '- `{member(name)}` - The member name (e.g.: ' f'{self.author.display_name})',
+            '- `{server(name)}` - The server name (e.g.: '
+            f'{server_name})\n'
+            '- `{member(tag)}` - The member username (e.g: '
+            f'{self.author.name})\n'
+            '- `{member(name)}` - The member name (e.g.: '
+            f'{self.author.display_name})',
         )
         return embed
 
     @discord.ui.button(label='Win Message Variables', style=discord.ButtonStyle.blurple)
-    async def win_message_variables(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]) -> None:
+    async def win_message_variables(
+        self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]
+    ) -> None:
         self.enable_all()
         button.disabled = True
         button.style = discord.ButtonStyle.grey
         await interaction.response.edit_message(embed=self.get_win_message_variables_embed(), view=self)
 
     @discord.ui.button(label='Giveaway Embed Variables', style=discord.ButtonStyle.blurple)
-    async def gw_embed_variables(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]) -> None:
+    async def gw_embed_variables(
+        self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]
+    ) -> None:
         self.enable_all()
         button.disabled = True
         button.style = discord.ButtonStyle.grey
@@ -469,7 +460,9 @@ class ShowVarsView(discord.ui.View):
         label='Greet Message Variables',
         style=discord.ButtonStyle.blurple,
     )
-    async def greet_msg_vars(self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]) -> None:
+    async def greet_msg_vars(
+        self, interaction: discord.Interaction[LegacyBot], button: discord.ui.Button[ShowVarsView]
+    ) -> None:
         assert interaction.guild
         self.enable_all()
         button.disabled = True
@@ -483,7 +476,8 @@ class ShowVarsView(discord.ui.View):
         self.win_message_variables.disabled = True
         self.win_message_variables.style = discord.ButtonStyle.grey
         self.message = await ctx.reply(
-            embed=self.get_win_message_variables_embed(), view=self,
+            embed=self.get_win_message_variables_embed(),
+            view=self,
         )
 
 
@@ -503,9 +497,7 @@ class Meta(commands.Cog):
 
     @discord.app_commands.command(name="help")
     @discord.app_commands.checks.cooldown(1, 30, key=lambda i: (i.guild_id, i.user.id))
-    async def slash_help(
-        self, interaction: discord.Interaction, *, command: str | None = None
-    ) -> None:
+    async def slash_help(self, interaction: discord.Interaction, *, command: str | None = None) -> None:
         """Shows a command, group or category help.
 
         Parameters
