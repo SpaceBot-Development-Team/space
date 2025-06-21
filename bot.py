@@ -40,6 +40,7 @@ import asyncpg
 
 from store.claimtime import ClaimtimeDBStore
 from errors import ModuleDisabled
+import wavelink
 
 MISSING: Any = discord.utils.MISSING
 PREMIUM_SKU_ID: Final[int] = 1256218013930094682
@@ -204,6 +205,7 @@ class LegacyBot(commands.Bot):
         self.claimtime_store: ClaimtimeDBStore = ClaimtimeDBStore(self)
         self._disabled_modules: dict[int, list[str]] = {}
         self.__wh_url: str | None = debug_webhook_url
+        self.wavelink_node_pool: wavelink.Pool = wavelink.Pool()
 
         self.add_check(self.module_enabled)
 
@@ -600,3 +602,8 @@ class LegacyBot(commands.Bot):
                     colour=discord.Colour.blue(),
                 ),
             )
+
+    async def close(self) -> None:
+        await self.pool.close()
+        await self.wavelink_node_pool.close()
+        await super().close()

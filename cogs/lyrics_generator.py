@@ -359,6 +359,8 @@ class ChooseSongSelect(discord.ui.Select['SelectSongView']):
                 str(error),
                 ephemeral=True,
             )
+            return
+
         view = LyricsGeneratorView(lyrics, interaction.client, interaction.user.id, song)
         await interaction.edit_original_response(
             view=view,

@@ -4,6 +4,7 @@ asyncpg==0.30.0
 asyncpg-stubs==0.30.1
 python-dotenv==1.1.0
 jishaku==2.6.0
-discord-ext-modal-paginator @ git+https://github.com/Soheab/modal-paginator@6adc7b2e4ff14ab75379b33e7c2a7d3480b3d42f
+discord-ext-modal-paginator @ git+https://github.com/Soheab/modal-paginator
 Pillow==11.2.1
 playwright==1.52.0
+wavelink @ git+https://github.com/DA-344/wavelink
