@@ -48,6 +48,7 @@ if __name__ == "__main__":
         "cogs.tools",
         "cogs.lyrics_generator",
         "jishaku",
+        "cogs.music",
     ]
 
     DEBUG_MODE: bool = sys.argv[-1] == '--debug'
@@ -99,6 +100,7 @@ if __name__ == "__main__":
                     bot.status = discord.Status.idle
                     bot.activity = discord.Game('?help')
                 else:
+                    bot.status = discord.Status.idle
                     bot.command_prefix = '-'
                     bot.NODEBUGREADY = True  # type: ignore
 
