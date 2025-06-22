@@ -174,7 +174,7 @@ class Music(commands.Cog):
                 continue
             else:
                 _log.info(f'Successfully connected to server number {server} at {host}')
-                break
+                return
 
         _log.info('Music is not available, unloading cog.')
         await self.bot.remove_cog(self.__cog_name__)
