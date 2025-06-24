@@ -518,7 +518,7 @@ class Music(commands.Cog):
             pass
 
     @commands.Cog.listener('on_voice_state_update')
-    async def bot_should_disconnect(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+    async def check_bot_should_disconnect(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
         player = member.guild.voice_client
         guild_id = member.guild.id
 
