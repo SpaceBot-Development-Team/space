@@ -24,10 +24,11 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import os
 import asyncio
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar, overload
 
 import wavelink
 
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
     from bot import LegacyBot, LegacyBotContext as Context
 
 _log = logging.getLogger(__name__)
+K = TypeVar('K')
 
 
 class SelectSongView(discord.ui.LayoutView):
@@ -137,11 +139,43 @@ class ChooseSongSelect(discord.ui.Select['SelectSongView']):
         )
 
 
+class LockDict(Generic[K]):
+    def __init__(self, initial: dict[K, asyncio.Lock] | None = None) -> None:
+        self.__data: dict[K, asyncio.Lock] = initial or {}
+
+    def __getitem__(self, key: K) -> asyncio.Lock:
+        try:
+            lock = self.__data[key]
+        except KeyError:
+            lock = self.__data[key] = asyncio.Lock()
+        return lock
+
+    def __setitem__(self, key: K, value: asyncio.Lock) -> None:
+        self.__data[key] = value
+
+    def get(self, key: K) -> asyncio.Lock:
+        return self[key]
+
+    @overload
+    def set(self, key: K) -> None:
+        ...
+
+    @overload
+    def set(self, key: K, value: asyncio.Lock) -> None:
+        ...
+
+    def set(self, key: K, value: asyncio.Lock | None = None) -> None:
+        value = value or asyncio.Lock()
+        self[key] = value
+
+
 class Music(commands.Cog):
     """Commands that allow the bot to play music on your server."""
 
     def __init__(self, bot: LegacyBot) -> None:
         self.bot: LegacyBot = bot
+        self.disconnect_task: dict[int, asyncio.Task[None]] = {}
+        self.locks: LockDict[int] = LockDict()
 
     async def cog_load(self) -> None:
         if self.bot.wavelink_node_pool.nodes:
@@ -482,6 +516,94 @@ class Music(commands.Cog):
             await payload.player.channel.edit(status=f'Playing {song.title} by {song.author}'[:500])  # type: ignore
         except:
             pass
+
+    @commands.Cog.listener('on_voice_state_update')
+    async def bot_should_disconnect(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+        player = member.guild.voice_client
+        guild_id = member.guild.id
+
+        if not player or not isinstance(player, wavelink.Player):
+            # We don't care about non-playing things
+            return
+
+        player_id = player.channel.id
+
+        lock = self.locks.get(guild_id)
+        async with lock:
+            if before.channel and not after.channel:
+                # user disconnected a voice channel
+                if before.channel.id != player_id:
+                    return
+
+                if not before.channel.members:
+                        task = self.disconnect_task.get(guild_id)
+
+                        if task:
+                            # disconnect is already scheduled
+                            return
+
+                        task = self.disconnect_task[guild_id] = self.bot.loop.create_task(self.do_disconnect(player))
+                        task.add_done_callback(self.remove_task(guild_id))
+            elif not before.channel and after.channel:
+                # user connected a voice channel
+                if after.channel.id != player_id:
+                    return
+
+                task = self.disconnect_task.get(guild_id)
+
+                if not task:
+                    # bot was not scheduled for disconnect
+                    return
+
+                if not task.done():
+                    task.cancel()
+
+            elif before.channel and after.channel:
+                # user could have changed channels
+                if before.channel.id == after.channel.id:
+                    # the user may have just updated their mute / deaf state or other, ignore
+                    return
+
+                if before.channel.id == player_id and after.channel.id != player_id:
+                    # user left the player channel
+                    task = self.disconnect_task.get(guild_id)
+
+                    if task:
+                        # disconnect is already scheduled
+                        return
+
+                    task = self.disconnect_task[guild_id] = self.bot.loop.create_task(self.do_disconnect(player))
+                    task.add_done_callback(self.remove_task(guild_id))
+                elif before.channel.id != player_id and after.channel.id == player_id:
+                    # user joined the player channel
+                    task = self.disconnect_task.get(guild_id)
+
+                    if not task:
+                        # bot was not scheduled for disconnect
+                        return
+
+                    if not task.done():
+                        task.cancel()
+                else:
+                    # unhandled case, ignore
+                    return
+            else:
+                # unhandled case, ignore
+                return
+
+    async def do_disconnect(self, player: wavelink.Player) -> None:
+        # wait 1 minute before fully disconnecting
+        await asyncio.sleep(60)
+
+        if player.connected:
+            if player.playing:
+                await player.stop(force=True)
+            await player.disconnect()
+
+    def remove_task(self, guild_id: int) -> Callable[[asyncio.Task], None]:
+        def inner(task: asyncio.Task) -> None:
+            self.disconnect_task.pop(guild_id, None)
+        return inner
 
 
 async def setup(bot: LegacyBot) -> None:
