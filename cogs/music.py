@@ -252,7 +252,7 @@ class Music(commands.Cog):
         player = ctx.voice_client
 
         if not player or not isinstance(player, wavelink.Player):
-            await ctx.reply(':x: | There is no current voice player!')
+            await ctx.invoke(self.vc_join)
             return
 
         if not ctx.author.voice or not ctx.author.voice.channel or ctx.author.voice.channel.id != player.channel.id:
@@ -350,15 +350,17 @@ class Music(commands.Cog):
 
         player = ctx.voice_client
 
-        if not player or not isinstance(player, wavelink.Player):
-            await ctx.reply(':x: | There is no current voice player!')
-            return
+        async with ctx.typing():
+            if not player or not isinstance(player, wavelink.Player):
+                await ctx.reply(':x: | There is no current voice player!')
+                return
 
-        if not ctx.author.voice or not ctx.author.voice.channel or ctx.author.voice.channel.id != player.channel.id:
-            await ctx.reply(':x: | You must be on the same channel as the bot in order to manage the music!')
-            return
+            if not ctx.author.voice or not ctx.author.voice.channel or ctx.author.voice.channel.id != player.channel.id:
+                await ctx.reply(':x: | You must be on the same channel as the bot in order to manage the music!')
+                return
 
-        await player.disconnect(force=True)
+            await player.disconnect(force=True)
+            await ctx.reply(':white_check_mark: | Player has been disconnected!')
 
     @music.group(name='volume', fallback='set')
     @commands.cooldown(1, 10, commands.BucketType.guild)
