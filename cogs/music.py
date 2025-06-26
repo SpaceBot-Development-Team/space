@@ -226,11 +226,24 @@ class Music(commands.Cog):
             return
 
         async with ctx.typing():
-            if not ctx.author.voice or not ctx.author.voice.channel:
-                await ctx.reply(':x: | You are not in a voice channel!')
-                return
-            await ctx.author.voice.channel.connect(cls=wavelink.Player)
+            success = await self.do_join(ctx)
+
+        if not success:
+            await ctx.reply(':x: | There was an error when trying to join the voice channel')
+            return
         await ctx.reply(':white_check_mark: | Successfully joined the voice channel!')
+
+    async def do_join(self, ctx: Context) -> bool:
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            await ctx.reply(':x: | You are not in a voice channel!')
+            return False
+        try:
+            await ctx.author.voice.channel.connect(cls=wavelink.Player)
+        except Exception as e:
+            _log.exception('Ignoring exception in do_join:', exc_info=e)
+            return False
+        else:
+            return True
 
     @music.command(name='play')
     @commands.cooldown(1, 15, commands.BucketType.member)
@@ -252,7 +265,11 @@ class Music(commands.Cog):
         player = ctx.voice_client
 
         if not player or not isinstance(player, wavelink.Player):
-            await ctx.invoke(self.vc_join)
+            success = await self.do_join(ctx)
+            if not success:
+                await ctx.reply(':x: | There was an error when trying to join the voice channel')
+                return
+            await ctx.reinvoke()
             return
 
         if not ctx.author.voice or not ctx.author.voice.channel or ctx.author.voice.channel.id != player.channel.id:
