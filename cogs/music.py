@@ -265,6 +265,7 @@ class Music(commands.Cog):
         player = ctx.voice_client
 
         if not player or not isinstance(player, wavelink.Player):
+            await ctx.defer()
             success = await self.do_join(ctx)
             if not success:
                 await ctx.reply(':x: | There was an error when trying to join the voice channel')
