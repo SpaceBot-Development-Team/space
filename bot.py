@@ -116,7 +116,7 @@ class LegacyBotContext(commands.Context["LegacyBot"]):
                     [
                         _
                         async for _ in self.bot.entitlements(
-                            user=self.author, guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)]
+                            guild=self.guild, skus=[discord.Object(PREMIUM_SKU_ID)],
                         )
                     ]
                 )
