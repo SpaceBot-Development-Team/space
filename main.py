@@ -22,6 +22,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 """
 
+import logging.handlers
 import traceback
 
 if __name__ == "__main__":
@@ -29,6 +30,7 @@ if __name__ == "__main__":
     import os
     import json
     import sys
+    import logging
 
     import aiohttp
     import discord
@@ -105,6 +107,17 @@ if __name__ == "__main__":
                     bot.NODEBUGREADY = True  # type: ignore
 
                 bot.pool = pool
+
+                handler = logging.handlers.RotatingFileHandler(
+                    filename='discord.log',
+                    encoding='utf-8',
+                    maxBytes=32 * 1024 * 1024,
+                    backupCount=5,
+                )
+                dt_fmt = '%Y-%m-%d %H:%M:%S'
+                fmt = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
+                handler.setFormatter(fmt)
+                logging.getLogger('discord').addHandler(handler)
 
                 discord.utils.setup_logging()
 
