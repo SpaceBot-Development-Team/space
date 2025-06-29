@@ -271,7 +271,7 @@ class Music(commands.Cog):
                 await ctx.reply(':x: | There was an error when trying to join the voice channel')
                 return
             ctx.command.reset_cooldown(ctx)  # type: ignore
-            await self.vc_play.invoke(ctx, query=query)
+            await self.vc_play(ctx, source=source, query=query)
             return
 
         if not ctx.author.voice or not ctx.author.voice.channel or ctx.author.voice.channel.id != player.channel.id:
