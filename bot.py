@@ -37,10 +37,10 @@ from discord import app_commands
 from discord.ext import commands
 
 import asyncpg
+import wavelink
 
 from store.claimtime import ClaimtimeDBStore
 from errors import ModuleDisabled
-import wavelink
 
 MISSING: Any = discord.utils.MISSING
 PREMIUM_SKU_ID: Final[int] = 1256218013930094682

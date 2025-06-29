@@ -182,7 +182,7 @@ class Music(commands.Cog):
             # prevent from "clone connecting" nodes
             return
 
-        for server in range(1, 7):
+        for server in range(1, 8):
             host = os.getenv(f'LAVALINK_{server}_HOST')
             password = os.getenv(f'LAVALINK_{server}_PASS')
 
@@ -240,7 +240,7 @@ class Music(commands.Cog):
         try:
             await ctx.author.voice.channel.connect(cls=wavelink.Player)
         except Exception as e:
-            _log.exception('Ignoring exception in do_join:', exc_info=e)
+            _log.exception('Ignoring exception in do_join:', exc_info=e, stacklevel=2)
             return False
         else:
             return True
@@ -270,6 +270,7 @@ class Music(commands.Cog):
             if not success:
                 await ctx.reply(':x: | There was an error when trying to join the voice channel')
                 return
+            ctx.command.reset_cooldown(ctx)  # type: ignore
             await self.vc_play.invoke(ctx)
             return
 
